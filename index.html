@@ -57,8 +57,15 @@
       const video = await setupCamera();
       const canvas = document.getElementById('canvas');
       const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      
+      // Wait for video to be ready
+      await new Promise(resolve => {
+        video.onloadeddata = () => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          resolve();
+        };
+      });
 
       await tf.setBackend('webgl');
       await tf.ready();
@@ -79,9 +86,24 @@
       }
 
       async function detect() {
-        const poses = await detector.estimatePoses(video);
+        let poses = [];
+        try {
+          poses = await detector.estimatePoses(video, {
+            flipHorizontal: false,
+            maxPoses: 1,
+            scoreThreshold: 0.3
+          });
+        } catch (error) {
+          console.error('Pose detection error:', error);
+        }
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Display detection status
+        ctx.fillStyle = 'white';
+        ctx.font = '16px Arial';
+        ctx.fillText(`Poses detected: ${poses.length}`, 10, 20);
 
         if (poses.length > 0) {
           const kp = poses[0].keypoints;
@@ -96,11 +118,11 @@
           });
 
           if (wrist && shoulder) {
-            // Show confidence scores
+            // Show confidence scores and coordinates
             ctx.fillStyle = 'white';
             ctx.font = '16px Arial';
-            ctx.fillText(`Wrist confidence: ${wrist.score.toFixed(2)}`, 10, 20);
-            ctx.fillText(`Shoulder confidence: ${shoulder.score.toFixed(2)}`, 10, 40);
+            ctx.fillText(`Wrist confidence: ${wrist.score.toFixed(2)} (${wrist.x.toFixed(0)}, ${wrist.y.toFixed(0)})`, 10, 40);
+            ctx.fillText(`Shoulder confidence: ${shoulder.score.toFixed(2)} (${shoulder.x.toFixed(0)}, ${shoulder.y.toFixed(0)})`, 10, 60);
             
             if (wrist.score > 0.3 && shoulder.score > 0.3) {
               drawPoint(wrist, 'red');
@@ -108,16 +130,15 @@
 
               // Show vertical distance
               const distance = wrist.y - shoulder.y;
-              ctx.fillText(`Vertical distance: ${distance.toFixed(0)}px`, 10, 60);
+              ctx.fillText(`Vertical distance: ${distance.toFixed(0)}px`, 10, 80);
+              ctx.fillText(`Current stage: ${stage || 'none'}`, 10, 100);
 
               if (wrist.y > shoulder.y + 30) {
                 stage = 'down';
-                ctx.fillText('Stage: DOWN', 10, 80);
               }
               if (wrist.y < shoulder.y && stage === 'down') {
                 reps++;
                 stage = 'up';
-                ctx.fillText('Stage: UP', 10, 80);
                 document.getElementById('reps').textContent = `Reps: ${reps}`;
               }
             }
