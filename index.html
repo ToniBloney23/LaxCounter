@@ -6,10 +6,10 @@
   <title>Wall Ball Rep Tracker</title>
   <style>
     body {
-      background-color: #121212;
-      color: #eee;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #121212;
+      color: #fff;
       text-align: center;
+      font-family: sans-serif;
       margin: 0;
       padding: 1rem;
     }
@@ -17,50 +17,105 @@
       margin-bottom: 1rem;
     }
     #reps {
-      font-size: 3rem;
+      font-size: 2.5rem;
       margin-bottom: 1rem;
     }
     video, canvas {
-      max-width: 90vw;
-      max-height: 60vh;
-      border-radius: 12px;
-      margin-bottom: 1rem;
-      box-shadow: 0 0 10px rgba(255,255,255,0.2);
+      max-width: 100%;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
     }
   </style>
 </head>
 <body>
-  <h1>Wall Ball Rep Tracker</h1>
+  <h1>Wall Ball Rep Tracker (Chrome)</h1>
   <div id="reps">Reps: 0</div>
   <video id="video" autoplay playsinline muted></video>
   <canvas id="canvas"></canvas>
 
-<!-- TensorFlow.js -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0"></script>
-
-<!-- Pose Detection (correct working link) -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0"></script>
+  <!-- Pose Detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 
   <script>
-    function checkLibrariesLoaded() {
-      if (typeof tf === 'undefined') {
-        alert('TensorFlow.js failed to load.');
-        return false;
-      }
-      if (typeof poseDetection === 'undefined') {
-        alert('poseDetection library failed to load.');
-        return false;
-      }
-      return true;
-    }
-
     async function setupCamera() {
       const video = document.getElementById('video');
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-        await new Promise(resolve => video.onloadedmetadata = resolve);
+        await new Promise(resolve => (video.onloadedmetadata = resolve));
         video.play();
         return video;
       } catch (err) {
-        alert('Error accessing camera: ' + err.message)
+        alert('Camera access denied or unavailable: ' + err.message);
+        throw err;
+      }
+    }
+
+    async function main() {
+      const video = await setupCamera();
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      await tf.setBackend('webgl');
+      await tf.ready();
+
+      const detector = await poseDetection.createDetector(
+        poseDetection.SupportedModels.BlazePose,
+        { runtime: 'tfjs', modelType: 'full' }
+      );
+
+      let reps = 0;
+      let stage = null;
+
+      function drawPoint(kp, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(kp.x, kp.y, 8, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      async function detect() {
+        const poses = await detector.estimatePoses(video);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        if (poses.length > 0) {
+          const kp = poses[0].keypoints;
+          const wrist = kp.find(p => p.name === 'right_wrist');
+          const shoulder = kp.find(p => p.name === 'right_shoulder');
+
+          if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
+            drawPoint(wrist, 'red');
+            drawPoint(shoulder, 'lime');
+
+            if (wrist.y > shoulder.y + 40) {
+              stage = 'down';
+            }
+            if (wrist.y < shoulder.y && stage === 'down') {
+              reps++;
+              stage = 'up';
+              document.getElementById('reps').textContent = `Reps: ${reps}`;
+            }
+          }
+        }
+
+        requestAnimationFrame(detect);
+      }
+
+      detect();
+    }
+
+    window.onload = () => {
+      if (window.tf && window.poseDetection) {
+        main();
+      } else {
+        alert('TensorFlow or poseDetection failed to load.');
+      }
+    };
+  </script>
+</body>
+</html>
