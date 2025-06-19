@@ -162,8 +162,6 @@
 
         const detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'tfjs' });
 
-        let reps = 0;
-        let stage = null; // 'up' or 'down'
         let showDots = true;
 
         const viewToggleButton = document.getElementById('view-toggle');
@@ -208,6 +206,9 @@
 
         detect();
     }
+
+    let reps = 0;
+    let stage = null; // 'up' or 'down'
 
     function resetReps() {
       reps = 0;
