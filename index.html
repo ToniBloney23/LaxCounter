@@ -72,7 +72,7 @@
 <body>
   <h1>Wall Ball Rep Tracker (Chrome)</h1>
   <div id="controls-container" style="margin-bottom: 1rem;">
-    <button id="view-toggle" style="margin-left: 1rem; padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">Hide Dots</button>
+    <button id="view-toggle" style="margin-left: 1rem; padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">Show Dots</button>
   </div>
   <div id="reps-container">
     <div id="reps">Reps: 0</div>
@@ -162,7 +162,7 @@
 
         const detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'tfjs' });
 
-        let showDots = true;
+        let showDots = false;
 
         const viewToggleButton = document.getElementById('view-toggle');
         viewToggleButton.addEventListener('click', () => {
