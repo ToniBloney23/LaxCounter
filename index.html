@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Wall Ball Rep Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
   <style>
     body {
       background: #121212;
@@ -68,12 +72,11 @@
 <body>
   <h1>Wall Ball Rep Tracker (Chrome)</h1>
   <div id="controls-container" style="margin-bottom: 1rem;">
-    <label for="stick-color" style="margin-right: 0.5rem;">Stick Color:</label>
-    <select id="stick-color" style="padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px;">
-      <option value="black">Black</option>
-      <option value="white">White</option>
+    <label for="hand-select" style="margin-right: 0.5rem;">Tracked Hand:</label>
+    <select id="hand-select" style="padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px;">
+      <option value="right">Right</option>
+      <option value="left">Left</option>
     </select>
-    <button id="view-toggle" style="margin-left: 1rem; padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">Toggle Lines</button>
   </div>
   <div id="reps-container">
     <div id="reps">Reps: 0</div>
@@ -88,11 +91,8 @@
   <script>
     async function setupCamera() {
       const video = document.getElementById('video');
-      
-      // Check if user has previously granted camera access
       const cameraAccessGranted = localStorage.getItem('wallBallCameraAccess') === 'granted';
       
-      // Show camera permission request message
       document.getElementById('reps').textContent = 'Please allow camera access...';
       document.getElementById('camera-status').style.display = 'block';
       
@@ -111,24 +111,13 @@
           }
         });
         video.srcObject = stream;
-        
-        // Save camera access permission
         localStorage.setItem('wallBallCameraAccess', 'granted');
-        
-        // Hide camera permission message once access is granted
         document.getElementById('camera-status').style.display = 'none';
         
-        // Wait for video to be fully loaded
         await new Promise((resolve) => {
           video.onloadedmetadata = () => {
             video.width = video.videoWidth;
             video.height = video.videoHeight;
-            console.log('Video metadata loaded:', {
-              width: video.width,
-              height: video.height,
-              videoWidth: video.videoWidth,
-              videoHeight: video.videoHeight
-            });
             resolve();
           };
         });
@@ -136,9 +125,7 @@
         await video.play();
         return video;
       } catch (err) {
-        // Save that camera access was denied
         localStorage.setItem('wallBallCameraAccess', 'denied');
-        
         document.getElementById('camera-status').innerHTML = 
           'Camera access denied or unavailable. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
         console.error('Camera error:', err.message);
@@ -153,127 +140,79 @@
       });
     }
 
+    function drawPoint(ctx, y, x, r, color) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    function drawKeypoints(keypoints, ctx) {
+        for (let i = 0; i < keypoints.length; i++) {
+            const keypoint = keypoints[i];
+            if (keypoint.score > 0.5) {
+                drawPoint(ctx, keypoint.y, keypoint.x, 5, 'red');
+            }
+        }
+    }
+
     async function main() {
         const video = await setupCamera();
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-    
-        // Set canvas dimensions to match video
         canvas.width = video.width;
         canvas.height = video.height;
-        
-        // Initialize variables
-        let reps = 0;
-        let stickStage = null;
-        let lastRepTime = 0;
-        const REP_COOLDOWN = 1000; // Minimum time (ms) between reps
-        
-        // Start the detection loop
-        detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN);
-    }
 
-    async function detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN) {
-        try {
-            // Get video frame data
+        const detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'tfjs' });
+
+        let reps = 0;
+        let stage = null; // 'up' or 'down'
+
+        async function detect() {
+            const poses = await detector.estimatePoses(video);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Get image data to analyze pixels
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            
-            // Track stick
-            let stickX = 0;
-            let stickY = 0;
-            let matchingPixels = 0;
-            
-            // Get selected color
-            const selectedColor = document.getElementById('stick-color').value;
-            
-            // Scan for matching colored pixels
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                let isMatch = false;
-                if (selectedColor === 'black') {
-                    isMatch = r < 50 && g < 50 && b < 50;
-                } else if (selectedColor === 'white') {
-                    isMatch = r > 200 && g > 200 && b > 200;
-                }
-                
-                if (isMatch) {
-                    const pixelIndex = i / 4;
-                    const x = pixelIndex % canvas.width;
-                    const y = Math.floor(pixelIndex / canvas.width);
-                    stickX += x;
-                    stickY += y;
-                    matchingPixels++;
+
+            if (poses.length > 0) {
+                const keypoints = poses[0].keypoints;
+                const trackedHand = document.getElementById('hand-select').value;
+
+                const wrist = keypoints.find(k => k.name === `${trackedHand}_wrist`);
+                const shoulder = keypoints.find(k => k.name === `${trackedHand}_shoulder`);
+
+                if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
+                    drawKeypoints(keypoints, ctx);
+                    const distance = Math.abs(wrist.y - shoulder.y);
+
+                    if (distance < 50) { // Hand is up
+                        stage = 'up';
+                    }
+                    if (distance > 100 && stage === 'up') { // Hand is down
+                        stage = 'down';
+                        reps++;
+                        document.getElementById('reps').textContent = `Reps: ${reps}`;
+                    }
                 }
             }
-            
-            if (matchingPixels > 100) {
-                stickX = Math.round(stickX / matchingPixels);
-                stickY = Math.round(stickY / matchingPixels);
-                
-                ctx.fillStyle = '#00FF00';
-                ctx.beginPath();
-                ctx.arc(stickX, stickY, 8, 0, 2 * Math.PI);
-                ctx.fill();
-                
-                ctx.fillStyle = 'white';
-                ctx.font = '16px Arial';
-                ctx.fillText(`${selectedColor.charAt(0).toUpperCase() + selectedColor.slice(1)} Stick: (${stickX}, ${stickY})`, 10, 20);
-                
-                const currentTime = Date.now();
-                const timeSinceLastRep = currentTime - lastRepTime;
-                
-                if (stickY < canvas.height / 3) {
-                    stickStage = 'ready';
-                }
-                
-                if (stickY > canvas.height * 2/3 && 
-                    stickStage === 'ready' && 
-                    timeSinceLastRep > REP_COOLDOWN) {
-                    reps++;
-                    stickStage = 'down';
-                    lastRepTime = currentTime;
-                    document.getElementById('reps').textContent = `Reps: ${reps}`;
-                }
-                
-                ctx.fillText(`Stage: ${stickStage || 'none'}`, 10, 40);
-            }
-        } catch (error) {
-            console.error('Detection error:', error);
+            requestAnimationFrame(detect);
         }
-        
-        requestAnimationFrame(() => detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN));
+
+        detect();
     }
 
     function resetReps() {
       reps = 0;
-      stickStage = null;
+      stage = null;
       document.getElementById('reps').textContent = 'Reps: 0';
     }
 
     window.onload = () => {
-        main();
-        
-        // Load saved color preference
-        const savedColor = localStorage.getItem('wallBallStickColor') || 'black';
-        document.getElementById('stick-color').value = savedColor;
-        
-        // Add event listener for color selection change
-        document.getElementById('stick-color').addEventListener('change', function() {
-          localStorage.setItem('wallBallStickColor', this.value);
-        });
-        
-        // Add event listener for view toggle
-        let showLines = true;
-        document.getElementById('view-toggle').addEventListener('click', function() {
-          showLines = !showLines;
-          this.textContent = showLines ? 'Hide Lines' : 'Show Lines';
+        main().catch(console.error);
+        const savedHand = localStorage.getItem('wallBallTrackedHand') || 'right';
+        document.getElementById('hand-select').value = savedHand;
+
+        document.getElementById('hand-select').addEventListener('change', function() {
+            localStorage.setItem('wallBallTrackedHand', this.value);
         });
     };
   </script>
