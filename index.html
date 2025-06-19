@@ -35,11 +35,24 @@
   <video id="video" autoplay playsinline muted></video>
   <canvas id="canvas"></canvas>
 
-  <!-- TensorFlow.js and Pose Detection Model -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@3.6.0/dist/pose-detection.min.js"></script>
+  <!-- Load TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js" onerror="alert('Failed to load TensorFlow.js')" ></script>
+  <!-- Load pose-detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@3.6.0/dist/pose-detection.min.js" onerror="alert('Failed to load pose-detection model')" ></script>
 
   <script>
+    function checkLibrariesLoaded() {
+      if (typeof tf === 'undefined') {
+        alert('TensorFlow.js failed to load.');
+        return false;
+      }
+      if (typeof poseDetection === 'undefined') {
+        alert('poseDetection library failed to load.');
+        return false;
+      }
+      return true;
+    }
+
     async function setupCamera() {
       const video = document.getElementById('video');
       try {
@@ -49,78 +62,4 @@
         video.play();
         return video;
       } catch (err) {
-        alert('Error accessing camera: ' + err.message);
-        throw err;
-      }
-    }
-
-    async function main() {
-      const video = await setupCamera();
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      await tf.setBackend('webgl');
-      await tf.ready();
-
-      const detector = await poseDetection.createDetector(
-        poseDetection.SupportedModels.BlazePose,
-        { runtime: 'tfjs', modelType: 'full' }
-      );
-
-      let reps = 0;
-      let stage = null;
-
-      function drawKeypoint(keypoint, color) {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(keypoint.x, keypoint.y, 8, 0, 2 * Math.PI);
-        ctx.fill();
-      }
-
-      async function detect() {
-        const poses = await detector.estimatePoses(video);
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        if (poses.length > 0) {
-          const keypoints = poses[0].keypoints;
-          const wrist = keypoints.find(k => k.name === 'right_wrist');
-          const shoulder = keypoints.find(k => k.name === 'right_shoulder');
-
-          if (
-            wrist && shoulder &&
-            wrist.score > 0.5 && shoulder.score > 0.5
-          ) {
-            drawKeypoint(wrist, 'red');
-            drawKeypoint(shoulder, 'lime');
-
-            // Rep logic: wrist moves down below shoulder + 40 px, then back above shoulder
-            if (wrist.y > shoulder.y + 40) {
-              stage = 'forward';
-            }
-            if (wrist.y < shoulder.y && stage === 'forward') {
-              reps++;
-              stage = 'back';
-              document.getElementById('reps').textContent = `Reps: ${reps}`;
-            }
-          }
-        }
-        requestAnimationFrame(detect);
-      }
-
-      detect();
-    }
-
-    window.onload = () => {
-      if (window.tf && window.poseDetection) {
-        main();
-      } else {
-        alert('TensorFlow.js or poseDetection failed to load.');
-      }
-    };
-  </script>
-</body>
-</html>
+        alert('Error accessing camera: ' + err.message)
