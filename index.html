@@ -48,8 +48,8 @@
       box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
     .control-button, #reset-button, #view-toggle {
-      font-size: 1rem;
-      padding: 0.7rem 1.5rem;
+      font-size: 1.2rem;
+      padding: 1rem 2rem;
       border: none;
       border-radius: 25px;
       color: white;
@@ -420,16 +420,18 @@
                     }
                     const distance = Math.abs(wrist.y - shoulder.y);
 
-                    if (distance < 50) { // Hand is up
+                    // A rep is counted when the hand goes from above the shoulder to below it.
+                    if (wrist.y < shoulder.y - 15) { // Hand is above the shoulder
                         stage = 'up';
                     }
-                    if (distance > 100 && stage === 'up') { // Hand is down
+                    if (wrist.y > shoulder.y + 15 && stage === 'up') { // Hand is below the shoulder
                         stage = 'down';
                         reps++;
                         document.getElementById('reps').textContent = `Reps: ${reps}`;
                         if (reps % 10 === 0) {
                             document.getElementById('rep-sound').play();
                         }
+                        stage = null; // Reset for next rep
                     }
                 }
             }
