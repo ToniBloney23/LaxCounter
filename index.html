@@ -72,11 +72,7 @@
 <body>
   <h1>Wall Ball Rep Tracker (Chrome)</h1>
   <div id="controls-container" style="margin-bottom: 1rem;">
-    <label for="hand-select" style="margin-right: 0.5rem;">Tracked Hand:</label>
-    <select id="hand-select" style="padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px;">
-      <option value="right">Right</option>
-      <option value="left">Left</option>
-    </select>
+    <button id="view-toggle" style="margin-left: 1rem; padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">Hide Dots</button>
   </div>
   <div id="reps-container">
     <div id="reps">Reps: 0</div>
@@ -87,6 +83,7 @@
   </div>
   <video id="video" autoplay playsinline muted style="display: none;"></video>
   <canvas id="canvas"></canvas>
+  <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg"></audio>
 
   <script>
     async function setupCamera() {
@@ -167,6 +164,13 @@
 
         let reps = 0;
         let stage = null; // 'up' or 'down'
+        let showDots = true;
+
+        const viewToggleButton = document.getElementById('view-toggle');
+        viewToggleButton.addEventListener('click', () => {
+            showDots = !showDots;
+            viewToggleButton.textContent = showDots ? 'Hide Dots' : 'Show Dots';
+        });
 
         async function detect() {
             const poses = await detector.estimatePoses(video);
@@ -175,13 +179,15 @@
 
             if (poses.length > 0) {
                 const keypoints = poses[0].keypoints;
-                const trackedHand = document.getElementById('hand-select').value;
+                const trackedHand = 'right'; // Always track the right hand
 
                 const wrist = keypoints.find(k => k.name === `${trackedHand}_wrist`);
                 const shoulder = keypoints.find(k => k.name === `${trackedHand}_shoulder`);
 
                 if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
-                    drawKeypoints(keypoints, ctx);
+                    if (showDots) {
+                        drawKeypoints(keypoints, ctx);
+                    }
                     const distance = Math.abs(wrist.y - shoulder.y);
 
                     if (distance < 50) { // Hand is up
@@ -191,6 +197,9 @@
                         stage = 'down';
                         reps++;
                         document.getElementById('reps').textContent = `Reps: ${reps}`;
+                        if (reps % 10 === 0) {
+                            document.getElementById('rep-sound').play();
+                        }
                     }
                 }
             }
@@ -208,12 +217,6 @@
 
     window.onload = () => {
         main().catch(console.error);
-        const savedHand = localStorage.getItem('wallBallTrackedHand') || 'right';
-        document.getElementById('hand-select').value = savedHand;
-
-        document.getElementById('hand-select').addEventListener('change', function() {
-            localStorage.setItem('wallBallTrackedHand', this.value);
-        });
     };
   </script>
 </body>
