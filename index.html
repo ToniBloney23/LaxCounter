@@ -28,29 +28,22 @@
   </style>
 </head>
 <body>
-  <h1>Wall Ball Rep Tracker (Chrome)</h1>
+  <h1>Wall Ball Rep Tracker</h1>
   <div id="reps">Reps: 0</div>
   <video id="video" autoplay playsinline muted></video>
   <canvas id="canvas"></canvas>
 
-  <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0"></script>
-  <!-- Pose Detection -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 
   <script>
     async function setupCamera() {
       const video = document.getElementById('video');
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-        await new Promise(resolve => (video.onloadedmetadata = resolve));
-        video.play();
-        return video;
-      } catch (err) {
-        alert('Camera access denied or unavailable: ' + err.message);
-        throw err;
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      await new Promise(resolve => (video.onloadedmetadata = resolve));
+      video.play();
+      return video;
     }
 
     async function main() {
@@ -85,17 +78,22 @@
 
         if (poses.length > 0) {
           const kp = poses[0].keypoints;
-          const wrist = kp.find(p => p.name === 'right_wrist');
-          const shoulder = kp.find(p => p.name === 'right_shoulder');
+
+          // Use index-based access for reliability
+          const wrist = kp[16];    // right_wrist
+          const shoulder = kp[12]; // right_shoulder
 
           if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
             drawPoint(wrist, 'red');
             drawPoint(shoulder, 'lime');
 
-            if (wrist.y > shoulder.y + 40) {
+            // Debugging output
+            console.log(`Wrist Y: ${wrist.y}, Shoulder Y: ${shoulder.y}`);
+
+            if (wrist.y > shoulder.y + 20) {
               stage = 'down';
             }
-            if (wrist.y < shoulder.y && stage === 'down') {
+            if (wrist.y < shoulder.y - 10 && stage === 'down') {
               reps++;
               stage = 'up';
               document.getElementById('reps').textContent = `Reps: ${reps}`;
