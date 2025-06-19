@@ -74,6 +74,7 @@
       <option value="left">Left Hand</option>
       <option value="both">Both Hands</option>
     </select>
+    <button id="view-toggle" style="margin-left: 1rem; padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">Toggle Lines</button>
   </div>
   <div id="reps-container">
     <div id="reps">Reps: 0</div>
@@ -94,9 +95,18 @@
     async function setupCamera() {
       const video = document.getElementById('video');
       
+      // Check if user has previously granted camera access
+      const cameraAccessGranted = localStorage.getItem('wallBallCameraAccess') === 'granted';
+      
       // Show camera permission request message
       document.getElementById('reps').textContent = 'Please allow camera access...';
       document.getElementById('camera-status').style.display = 'block';
+      
+      if (cameraAccessGranted) {
+        document.getElementById('camera-status').innerHTML = 'Using saved camera permission...';
+      } else {
+        document.getElementById('camera-status').innerHTML = 'Requesting camera access...';
+      }
       
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -107,6 +117,9 @@
           }
         });
         video.srcObject = stream;
+        
+        // Save camera access permission
+        localStorage.setItem('wallBallCameraAccess', 'granted');
         
         // Hide camera permission message once access is granted
         document.getElementById('camera-status').style.display = 'none';
@@ -129,6 +142,9 @@
         await video.play();
         return video;
       } catch (err) {
+        // Save that camera access was denied
+        localStorage.setItem('wallBallCameraAccess', 'denied');
+        
         document.getElementById('camera-status').innerHTML = 
           'Camera access denied or unavailable. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
         console.error('Camera error:', err.message);
@@ -245,6 +261,8 @@
         ctx.stroke();
       }
 
+      let showLines = true; // Add this near the top of the script with other variables
+      
       async function detect() {
         let poses = [];
         try {
@@ -274,7 +292,12 @@
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+        
+        if (!showLines) {
+          requestAnimationFrame(detect);
+          return;
+        }
+        
         // Display detection status
         ctx.fillStyle = 'white';
         ctx.font = '16px Arial';
@@ -455,9 +478,12 @@
           // Save selection to localStorage
           selectedHand = this.value;
           localStorage.setItem('wallBallSelectedHand', selectedHand);
-          
-          // Reset rep counter when changing hands
-          resetReps();
+        });
+        
+        // Add event listener for view toggle
+        document.getElementById('view-toggle').addEventListener('click', function() {
+          showLines = !showLines;
+          this.textContent = showLines ? 'Hide Lines' : 'Show Lines';
         });
       } else {
         alert('TensorFlow or poseDetection failed to load.');
