@@ -209,6 +209,13 @@
         width: 100%;
         text-align: center;
       }
+      #nav-drawer {
+        width: 100%;
+        right: -100%;
+      }
+      #menu-icon.open + #nav-drawer {
+        right: 0;
+      }
     }
 
     #menu-icon {
@@ -442,9 +449,10 @@
     }
 
     document.getElementById('menu-icon').addEventListener('click', function() {
+      this.classList.toggle('open');
       var drawer = document.getElementById('nav-drawer');
-      if (drawer.style.right === '0px') {
-        drawer.style.right = '-300px';
+      if (drawer.style.right === '0px' || drawer.style.right === '') {
+        drawer.style.right = window.innerWidth <= 600 ? '-100%' : '-300px';
       } else {
         drawer.style.right = '0px';
       }
