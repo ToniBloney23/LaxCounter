@@ -68,11 +68,10 @@
 <body>
   <h1>Wall Ball Rep Tracker (Chrome)</h1>
   <div id="controls-container" style="margin-bottom: 1rem;">
-    <label for="hand-select" style="margin-right: 0.5rem;">Track:</label>
-    <select id="hand-select" style="padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px;">
-      <option value="right">Right Hand</option>
-      <option value="left">Left Hand</option>
-      <option value="both">Both Hands</option>
+    <label for="stick-color" style="margin-right: 0.5rem;">Stick Color:</label>
+    <select id="stick-color" style="padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px;">
+      <option value="black">Black</option>
+      <option value="white">White</option>
     </select>
     <button id="view-toggle" style="margin-left: 1rem; padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">Toggle Lines</button>
   </div>
@@ -85,11 +84,6 @@
   </div>
   <video id="video" autoplay playsinline muted style="display: none;"></video>
   <canvas id="canvas"></canvas>
-
-  <!-- TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0"></script>
-  <!-- Pose Detection -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 
   <script>
     async function setupCamera() {
@@ -160,334 +154,127 @@
     }
 
     async function main() {
-      const video = await setupCamera();
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-
-      // Log video element properties
-      console.log('Video element:', {
-        offsetWidth: video.offsetWidth,
-        offsetHeight: video.offsetHeight,
-        clientWidth: video.clientWidth,
-        clientHeight: video.clientHeight,
-        style: video.style.cssText
-      });
-      
-      // Set canvas dimensions to match video
-      canvas.width = video.width;
-      canvas.height = video.height;
-      
-      // Log canvas dimensions
-      console.log('Canvas dimensions set:', {
-        canvasWidth: canvas.width,
-        canvasHeight: canvas.height,
-        drawingBufferWidth: ctx.drawingBufferWidth,
-        drawingBufferHeight: ctx.drawingBufferHeight
-      });
-
-      // Test drawing video frame
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      console.log('Image data retrieved:', {
-        width: imageData.width,
-        height: imageData.height,
-        dataLength: imageData.data.length
-      });
-
-      // Initialize TensorFlow
-      document.getElementById('reps').textContent = 'Initializing...';
-      try {
-        await tf.setBackend('webgl');
-        await tf.ready();
-        console.log('TensorFlow initialized with backend:', tf.getBackend());
-      } catch (error) {
-        console.error('TensorFlow initialization error:', error);
-        document.getElementById('reps').textContent = 'Error: Could not initialize TensorFlow';
-        return;
-      }
-      document.getElementById('reps').textContent = 'Loading pose detection...';
-
-
-      let detector;
-      try {
-        detector = await poseDetection.createDetector(
-          poseDetection.SupportedModels.BlazePose,
-          { runtime: 'tfjs', modelType: 'full' }
-        );
-        console.log('Pose detector created successfully');
-        document.getElementById('reps').textContent = 'Reps: 0';
-      } catch (error) {
-        console.error('Pose detector creation error:', error);
-        document.getElementById('reps').textContent = 'Error: Could not initialize pose detection';
-        return;
-      }
-
-      let reps = 0;
-      let rightStage = null;
-      let leftStage = null;
-      let lastRepTime = 0;
-      const REP_COOLDOWN = 1000; // Minimum time (ms) between reps
-      
-      // Get saved hand preference from localStorage or default to right
-      let selectedHand = localStorage.getItem('wallBallSelectedHand') || "right";
-      
-      // Update dropdown to match saved preference
-      document.getElementById('hand-select').value = selectedHand;
-
-      function drawPoint(kp, color) {
-        if (!kp || typeof kp.x !== 'number' || typeof kp.y !== 'number') {
-          console.log('Invalid keypoint:', kp);
-          return;
-        }
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(kp.x, kp.y, 8, 0, 2 * Math.PI);
-        ctx.fill();
+        const video = await setupCamera();
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+    
+        // Set canvas dimensions to match video
+        canvas.width = video.width;
+        canvas.height = video.height;
         
-        // Draw coordinate text
-        ctx.fillStyle = 'white';
-        ctx.font = '12px Arial';
-        ctx.fillText(`(${Math.round(kp.x)},${Math.round(kp.y)})`, kp.x + 10, kp.y);
-      }
+        // Initialize variables
+        let reps = 0;
+        let stickStage = null;
+        let lastRepTime = 0;
+        const REP_COOLDOWN = 1000; // Minimum time (ms) between reps
+        
+        // Start the detection loop
+        detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN);
+    }
 
-      function drawLine(kp1, kp2, color) {
-        if (!kp1 || !kp2 || typeof kp1.x !== 'number' || typeof kp1.y !== 'number' || 
-            typeof kp2.x !== 'number' || typeof kp2.y !== 'number') return;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(kp1.x, kp1.y);
-        ctx.lineTo(kp2.x, kp2.y);
-        ctx.stroke();
-      }
-
-      let showLines = true; // Add this near the top of the script with other variables
-      
-      async function detect() {
-        let poses = [];
+    async function detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN) {
         try {
-          // Log video dimensions and readiness
-          console.log('Video state:', {
-            width: video.videoWidth,
-            height: video.videoHeight,
-            ready: video.readyState,
-            time: video.currentTime
-          });
-
-          poses = await detector.estimatePoses(video, {
-            flipHorizontal: false,
-            maxPoses: 1,
-            scoreThreshold: 0.2,
-            modelType: 'full'
-          });
-
-          // Log pose detection results
-          console.log('Pose detection result:', {
-            posesLength: poses.length,
-            firstPoseKeypoints: poses[0]?.keypoints?.length || 0
-          });
+            // Get video frame data
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Get image data to analyze pixels
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Track stick
+            let stickX = 0;
+            let stickY = 0;
+            let matchingPixels = 0;
+            
+            // Get selected color
+            const selectedColor = document.getElementById('stick-color').value;
+            
+            // Scan for matching colored pixels
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                
+                let isMatch = false;
+                if (selectedColor === 'black') {
+                    isMatch = r < 50 && g < 50 && b < 50;
+                } else if (selectedColor === 'white') {
+                    isMatch = r > 200 && g > 200 && b > 200;
+                }
+                
+                if (isMatch) {
+                    const pixelIndex = i / 4;
+                    const x = pixelIndex % canvas.width;
+                    const y = Math.floor(pixelIndex / canvas.width);
+                    stickX += x;
+                    stickY += y;
+                    matchingPixels++;
+                }
+            }
+            
+            if (matchingPixels > 100) {
+                stickX = Math.round(stickX / matchingPixels);
+                stickY = Math.round(stickY / matchingPixels);
+                
+                ctx.fillStyle = '#00FF00';
+                ctx.beginPath();
+                ctx.arc(stickX, stickY, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '16px Arial';
+                ctx.fillText(`${selectedColor.charAt(0).toUpperCase() + selectedColor.slice(1)} Stick: (${stickX}, ${stickY})`, 10, 20);
+                
+                const currentTime = Date.now();
+                const timeSinceLastRep = currentTime - lastRepTime;
+                
+                if (stickY < canvas.height / 3) {
+                    stickStage = 'ready';
+                }
+                
+                if (stickY > canvas.height * 2/3 && 
+                    stickStage === 'ready' && 
+                    timeSinceLastRep > REP_COOLDOWN) {
+                    reps++;
+                    stickStage = 'down';
+                    lastRepTime = currentTime;
+                    document.getElementById('reps').textContent = `Reps: ${reps}`;
+                }
+                
+                ctx.fillText(`Stage: ${stickStage || 'none'}`, 10, 40);
+            }
         } catch (error) {
-          console.error('Pose detection error:', error);
-        }
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        if (!showLines) {
-          requestAnimationFrame(detect);
-          return;
+            console.error('Detection error:', error);
         }
         
-        // Display detection status
-        ctx.fillStyle = 'white';
-        ctx.font = '16px Arial';
-        ctx.fillText(`Poses detected: ${poses.length}`, 10, 20);
-
-        if (poses.length > 0) {
-          const kp = poses[0].keypoints;
-          
-          // Get selected hand from dropdown
-          selectedHand = document.getElementById('hand-select').value;
-          
-          // Define connections and points based on selected hand
-          let connections = [];
-          let armPoints = [];
-          
-          if (selectedHand === 'right' || selectedHand === 'both') {
-            connections.push(['right_shoulder', 'right_elbow'], ['right_elbow', 'right_wrist']);
-            armPoints.push('right_shoulder', 'right_elbow', 'right_wrist');
-          }
-          
-          if (selectedHand === 'left' || selectedHand === 'both') {
-            connections.push(['left_shoulder', 'left_elbow'], ['left_elbow', 'left_wrist']);
-            armPoints.push('left_shoulder', 'left_elbow', 'left_wrist');
-          }
-          
-          // Draw arm skeleton lines
-          connections.forEach(([p1Name, p2Name]) => {
-            const p1 = kp.find(p => p.name === p1Name);
-            const p2 = kp.find(p => p.name === p2Name);
-            if (p1 && p2 && p1.score > 0.3 && p2.score > 0.3) {
-              // Use different colors for right and left arms
-              const color = p1Name.includes('right') ? '#FF5722' : '#2196F3';
-              drawLine(p1, p2, color);
-            }
-          });
-
-          // Draw arm keypoints
-          kp.forEach(point => {
-            if (point && armPoints.includes(point.name)) {
-              console.log(`Keypoint ${point.name}:`, {
-                x: point.x,
-                y: point.y,
-                score: point.score,
-                visible: point.score > 0.2
-              });
-              
-              if (point.score > 0.2) {
-                // Use different colors for right and left keypoints
-                const color = point.name.includes('right') ? '#FF5722' : '#2196F3';
-                drawPoint(point, color);
-              }
-            }
-          });
-
-          // Track rep counting based on selected hand
-          const currentTime = Date.now();
-          const timeSinceLastRep = currentTime - lastRepTime;
-          let textY = 40; // Starting Y position for text
-          
-          // Process right hand if selected
-          if (selectedHand === 'right' || selectedHand === 'both') {
-            const rightWrist = kp.find(p => p.name === 'right_wrist');
-            const rightShoulder = kp.find(p => p.name === 'right_shoulder');
-            
-            if (rightWrist && rightShoulder) {
-              // Show confidence scores and coordinates
-              ctx.fillStyle = 'white';
-              ctx.font = '16px Arial';
-              const wristScore = rightWrist.score || 0;
-              const shoulderScore = rightShoulder.score || 0;
-              const wristX = rightWrist.x || 0;
-              const wristY = rightWrist.y || 0;
-              const shoulderX = rightShoulder.x || 0;
-              const shoulderY = rightShoulder.y || 0;
-              
-              ctx.fillText(`Right Wrist: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, textY);
-              textY += 20;
-              ctx.fillText(`Right Shoulder: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, textY);
-              textY += 20;
-              
-              if (rightWrist.score > 0.3 && rightShoulder.score > 0.3) {
-                // Show vertical distance
-                const distance = rightWrist.y - rightShoulder.y;
-                ctx.fillText(`Right vertical distance: ${distance.toFixed(0)}px`, 10, textY);
-                textY += 20;
-                ctx.fillText(`Right stage: ${rightStage || 'none'}`, 10, textY);
-                textY += 20;
-
-                // Check for lacrosse throwing motion
-                // Ready position: Hand must be significantly above shoulder
-                if (rightWrist.y < rightShoulder.y - 150 && rightWrist.score > 0.5 && rightShoulder.score > 0.5) {
-                  rightStage = 'ready';
-                }
-
-                // Follow through: Hand must move below shoulder with minimum time between reps
-                if (rightWrist.y > rightShoulder.y + 50 && 
-                    rightStage === 'ready' && 
-                    timeSinceLastRep > REP_COOLDOWN &&
-                    rightWrist.score > 0.5 && rightShoulder.score > 0.5) {
-                  reps++;
-                  rightStage = 'up';
-                  lastRepTime = currentTime;
-                  document.getElementById('reps').textContent = `Reps: ${reps}`;
-                }
-              }
-            }
-          }
-          
-          // Process left hand if selected
-          if (selectedHand === 'left' || selectedHand === 'both') {
-            const leftWrist = kp.find(p => p.name === 'left_wrist');
-            const leftShoulder = kp.find(p => p.name === 'left_shoulder');
-            
-            if (leftWrist && leftShoulder) {
-              // Show confidence scores and coordinates
-              ctx.fillStyle = 'white';
-              ctx.font = '16px Arial';
-              const wristScore = leftWrist.score || 0;
-              const shoulderScore = leftShoulder.score || 0;
-              const wristX = leftWrist.x || 0;
-              const wristY = leftWrist.y || 0;
-              const shoulderX = leftShoulder.x || 0;
-              const shoulderY = leftShoulder.y || 0;
-              
-              ctx.fillText(`Left Wrist: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, textY);
-              textY += 20;
-              ctx.fillText(`Left Shoulder: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, textY);
-              textY += 20;
-              
-              if (leftWrist.score > 0.3 && leftShoulder.score > 0.3) {
-                // Show vertical distance
-                const distance = leftWrist.y - leftShoulder.y;
-                ctx.fillText(`Left vertical distance: ${distance.toFixed(0)}px`, 10, textY);
-                textY += 20;
-                ctx.fillText(`Left stage: ${leftStage || 'none'}`, 10, textY);
-                textY += 20;
-
-                // Check for lacrosse throwing motion
-                // Ready position: Hand must be significantly above shoulder
-                if (leftWrist.y < leftShoulder.y - 150 && leftWrist.score > 0.5 && leftShoulder.score > 0.5) {
-                  leftStage = 'ready';
-                }
-
-                // Follow through: Hand must move below shoulder with minimum time between reps
-                if (leftWrist.y > leftShoulder.y + 50 && 
-                    leftStage === 'ready' && 
-                    timeSinceLastRep > REP_COOLDOWN &&
-                    leftWrist.score > 0.5 && leftShoulder.score > 0.5) {
-                  reps++;
-                  leftStage = 'up';
-                  lastRepTime = currentTime;
-                  document.getElementById('reps').textContent = `Reps: ${reps}`;
-                }
-              }
-            }
-          }
-        }
-
-        requestAnimationFrame(detect);
-      }
-
-      detect();
+        requestAnimationFrame(() => detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN));
     }
 
     function resetReps() {
       reps = 0;
-      rightStage = null;
-      leftStage = null;
+      stickStage = null;
       document.getElementById('reps').textContent = 'Reps: 0';
     }
 
     window.onload = () => {
-      if (window.tf && window.poseDetection) {
         main();
         
-        // Add event listener for hand selection change
-        document.getElementById('hand-select').addEventListener('change', function() {
-          // Save selection to localStorage
-          selectedHand = this.value;
-          localStorage.setItem('wallBallSelectedHand', selectedHand);
+        // Load saved color preference
+        const savedColor = localStorage.getItem('wallBallStickColor') || 'black';
+        document.getElementById('stick-color').value = savedColor;
+        
+        // Add event listener for color selection change
+        document.getElementById('stick-color').addEventListener('change', function() {
+          localStorage.setItem('wallBallStickColor', this.value);
         });
         
         // Add event listener for view toggle
+        let showLines = true;
         document.getElementById('view-toggle').addEventListener('click', function() {
           showLines = !showLines;
           this.textContent = showLines ? 'Hide Lines' : 'Show Lines';
         });
-      } else {
-        alert('TensorFlow or poseDetection failed to load.');
-      }
     };
   </script>
 </body>
