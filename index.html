@@ -20,7 +20,10 @@
       font-size: 2.5rem;
       margin-bottom: 1rem;
     }
-    video, canvas {
+    video {
+      display: none;
+    }
+    canvas {
       max-width: 100%;
       width: 640px;
       height: 480px;
@@ -34,7 +37,7 @@
 <body>
   <h1>Wall Ball Rep Tracker (Chrome)</h1>
   <div id="reps">Reps: 0</div>
-  <video id="video" autoplay playsinline muted></video>
+  <video id="video" autoplay playsinline muted style="display: none;"></video>
   <canvas id="canvas"></canvas>
 
   <!-- TensorFlow.js -->
