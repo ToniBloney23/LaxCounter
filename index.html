@@ -6,7 +6,7 @@
   <title>Wall Ball Rep Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
@@ -15,7 +15,7 @@
     body {
       background: linear-gradient(to right, #232526, #414345);
       color: #f0f0f0;
-      font-family: 'Roboto', sans-serif;
+      font-family: 'Poppins', sans-serif;
       margin: 0;
       display: flex;
       flex-direction: column;
@@ -26,8 +26,9 @@
     }
     h1 {
       margin-bottom: 0.5rem;
-      font-size: 2.5rem;
+      font-size: 2.8rem;
       color: #4CAF50;
+      animation: fadeInDown 1s ease-out;
     }
     p {
       margin-bottom: 2rem;
@@ -159,10 +160,27 @@
 
     #leaderboard-list li, #session-history-list li {
       background: #444;
-      margin-bottom: 5px;
-      padding: 10px;
-      border-radius: 5px;
+      margin-bottom: 8px;
+      padding: 12px;
+      border-radius: 8px;
       list-style-position: inside;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    #leaderboard-list li:hover, #session-history-list li:hover {
+      background-color: #555;
+      transform: scale(1.02);
+    }
+
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @media (max-width: 600px) {
@@ -192,6 +210,43 @@
         text-align: center;
       }
     }
+
+    #menu-icon {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      cursor: pointer;
+      z-index: 1001;
+    }
+
+    #menu-icon div {
+      width: 35px;
+      height: 5px;
+      background-color: white;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    #nav-drawer {
+      position: fixed;
+      top: 0;
+      right: -300px; /* Start off-screen */
+      width: 250px;
+      height: 100%;
+      background-color: #333;
+      padding-top: 60px;
+      transition: 0.5s;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #nav-drawer .control-button {
+        width: 80%;
+        margin-bottom: 15px;
+    }
+
   </style>
 </head>
 <body>
@@ -203,11 +258,18 @@
       <button id="reset-button" onclick="resetReps()">Reset</button>
       <button id="save-button" class="control-button">Save</button>
     </div>
-    <div id="user-container" style="margin-top: 1rem;">
-      <span id="user-greeting"></span>
-      <button id="login-button" class="control-button">Login/Sign Up</button>
-      <button id="leaderboard-button" class="control-button">Leaderboard</button>
-      <button id="session-history-button" class="control-button">History</button>
+    <div id="menu-icon">
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+    <div id="nav-drawer">
+        <div id="user-container" style="margin-top: 1rem;">
+          <span id="user-greeting"></span>
+          <button id="login-button" class="control-button">Login/Sign Up</button>
+          <button id="leaderboard-button" class="control-button">Leaderboard</button>
+          <button id="session-history-button" class="control-button">History</button>
+        </div>
     </div>
     <canvas id="canvas"></canvas>
     <div id="controls-container">
@@ -226,7 +288,7 @@
       <h2>Login or Sign Up</h2>
       <input type="text" id="username-input" placeholder="Enter your username">
       <input type="password" id="password-input" placeholder="Enter your password">
-      <button id="login-submit">Go</button>
+      <button id="login-submit" class="control-button">Go</button>
       <p id="login-error" style="color:red; display:none;"></p>
     </div>
   </div>
@@ -351,10 +413,10 @@
                     }
                     const distance = Math.abs(wrist.y - shoulder.y);
 
-                    if (distance < 70) { // Hand is up
+                    if (distance < 50) { // Hand is up
                         stage = 'up';
                     }
-                    if (distance > 120 && stage === 'up') { // Hand is down
+                    if (distance > 100 && stage === 'up') { // Hand is down
                         stage = 'down';
                         reps++;
                         document.getElementById('reps').textContent = `Reps: ${reps}`;
@@ -378,6 +440,15 @@
       stage = null;
       document.getElementById('reps').textContent = 'Reps: 0';
     }
+
+    document.getElementById('menu-icon').addEventListener('click', function() {
+      var drawer = document.getElementById('nav-drawer');
+      if (drawer.style.right === '0px') {
+        drawer.style.right = '-300px';
+      } else {
+        drawer.style.right = '0px';
+      }
+    });
 
     window.onload = () => {
         main().catch(console.error);
