@@ -16,9 +16,26 @@
     h1 {
       margin-bottom: 1rem;
     }
-    #reps {
+    #reps-container {
       font-size: 2.5rem;
       margin-bottom: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+    }
+    #reset-button {
+      font-size: 1.2rem;
+      padding: 0.5rem 1rem;
+      background: #FF5722;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    #reset-button:hover {
+      background: #F4511E;
     }
     video {
       display: none;
@@ -36,7 +53,10 @@
 </head>
 <body>
   <h1>Wall Ball Rep Tracker (Chrome)</h1>
-  <div id="reps">Reps: 0</div>
+  <div id="reps-container">
+    <div id="reps">Reps: 0</div>
+    <button id="reset-button" onclick="resetReps()">Reset</button>
+  </div>
   <video id="video" autoplay playsinline muted style="display: none;"></video>
   <canvas id="canvas"></canvas>
 
@@ -270,10 +290,10 @@
               ctx.fillText(`Vertical distance: ${distance.toFixed(0)}px`, 10, 80);
               ctx.fillText(`Current stage: ${stage || 'none'}`, 10, 100);
 
-              if (wrist.y > shoulder.y + 30) {
+              if (wrist.y > shoulder.y + 50) {
                 stage = 'down';
               }
-              if (wrist.y < shoulder.y && stage === 'down') {
+              if (wrist.y < shoulder.y - 20 && stage === 'down') {
                 reps++;
                 stage = 'up';
                 document.getElementById('reps').textContent = `Reps: ${reps}`;
@@ -286,6 +306,12 @@
       }
 
       detect();
+    }
+
+    function resetReps() {
+      reps = 0;
+      stage = null;
+      document.getElementById('reps').textContent = 'Reps: 0';
     }
 
     window.onload = () => {
