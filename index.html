@@ -1,7 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><title>Minimal Test</title></head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wall Ball Rep Tracker</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 1rem;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    #reps {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+    video, canvas {
+      max-width: 90vw;
+      max-height: 60vh;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      box-shadow: 0 0 10px rgba(255,255,255,0.2);
+    }
+  </style>
+</head>
 <body>
-  <h1>Hello world</h1>
+  <h1>Wall Ball Rep Tracker</h1>
+  <div id="reps">Reps: 0</div>
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+
+  <!-- TensorFlow.js and Pose Detection Model -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@3.6.0/dist/pose-detection.min.js"></script>
+
+  <script>
+    async function setupCamera() {
+      const video = document.getElementById('video');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        await new Promise(resolve => video.onloadedmetadata = resolve);
+        video.play();
+        return video;
+      } catch (err) {
+        alert('Error accessing camera: ' + err.message);
+        throw err;
+      }
+    }
+
+    async function main() {
+      const video = await setupCamera();
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      await tf.setBackend('webgl');
+      await tf.ready();
+
+      const detector = await poseDetection.createDetector(
+        poseDetection.SupportedModels.BlazePose,
+        { runtime: 'tfjs', modelType: 'full' }
+      );
+
+      let reps = 0;
+      let stage = null;
+
+      function drawKeypoint(keypoint, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(keypoint.x, keypoint.y, 8, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      async function detect() {
+        const poses = await detector.estimatePoses(video);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        if (poses.length > 0) {
+          const keypoints = poses[0].keypoints;
+          const wrist = keypoints.find(k => k.name === 'right_wrist');
+          const shoulder = keypoints.find(k => k.name === 'right_shoulder');
+
+          if (
+            wrist && shoulder &&
+            wrist.score > 0.5 && shoulder.score > 0.5
+          ) {
+            drawKeypoint(wrist, 'red');
+            drawKeypoint(shoulder, 'lime');
+
+            // Rep logic: wrist moves down below shoulder + 40 px, then back above shoulder
+            if (wrist.y > shoulder.y + 40) {
+              stage = 'forward';
+            }
+            if (wrist.y < shoulder.y && stage === 'forward') {
+              reps++;
+              stage = 'back';
+              document.getElementById('reps').textContent = `Reps: ${reps}`;
+            }
+          }
+        }
+        requestAnimationFrame(detect);
+      }
+
+      detect();
+    }
+
+    window.onload = () => {
+      if (window.tf && window.poseDetection) {
+        main();
+      } else {
+        alert('TensorFlow.js or poseDetection failed to load.');
+      }
+    };
+  </script>
 </body>
 </html>
