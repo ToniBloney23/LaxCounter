@@ -88,17 +88,38 @@
           const wrist = kp.find(p => p.name === 'right_wrist');
           const shoulder = kp.find(p => p.name === 'right_shoulder');
 
-          if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
-            drawPoint(wrist, 'red');
-            drawPoint(shoulder, 'lime');
-
-            if (wrist.y > shoulder.y + 40) {
-              stage = 'down';
+          // Draw all detected keypoints for debugging
+          kp.forEach(point => {
+            if (point.score > 0.3) {
+              drawPoint(point, 'yellow');
             }
-            if (wrist.y < shoulder.y && stage === 'down') {
-              reps++;
-              stage = 'up';
-              document.getElementById('reps').textContent = `Reps: ${reps}`;
+          });
+
+          if (wrist && shoulder) {
+            // Show confidence scores
+            ctx.fillStyle = 'white';
+            ctx.font = '16px Arial';
+            ctx.fillText(`Wrist confidence: ${wrist.score.toFixed(2)}`, 10, 20);
+            ctx.fillText(`Shoulder confidence: ${shoulder.score.toFixed(2)}`, 10, 40);
+            
+            if (wrist.score > 0.3 && shoulder.score > 0.3) {
+              drawPoint(wrist, 'red');
+              drawPoint(shoulder, 'lime');
+
+              // Show vertical distance
+              const distance = wrist.y - shoulder.y;
+              ctx.fillText(`Vertical distance: ${distance.toFixed(0)}px`, 10, 60);
+
+              if (wrist.y > shoulder.y + 30) {
+                stage = 'down';
+                ctx.fillText('Stage: DOWN', 10, 80);
+              }
+              if (wrist.y < shoulder.y && stage === 'down') {
+                reps++;
+                stage = 'up';
+                ctx.fillText('Stage: UP', 10, 80);
+                document.getElementById('reps').textContent = `Reps: ${reps}`;
+              }
             }
           }
         }
