@@ -185,7 +185,9 @@
       <span class="close-button">&times;</span>
       <h2>Login or Sign Up</h2>
       <input type="text" id="username-input" placeholder="Enter your username">
+      <input type="password" id="password-input" placeholder="Enter your password">
       <button id="login-submit">Go</button>
+      <p id="login-error" style="color:red; display:none;"></p>
     </div>
   </div>
 
@@ -390,18 +392,45 @@
 
       document.getElementById('login-submit').onclick = () => {
         const username = document.getElementById('username-input').value.trim();
-        if (username) {
-          login(username);
-          loginModal.style.display = 'none';
+        const password = document.getElementById('password-input').value;
+        const loginError = document.getElementById('login-error');
+
+        if (username && password) {
+          if (login(username, password)) {
+            loginModal.style.display = 'none';
+            loginError.style.display = 'none';
+          } else {
+            loginError.textContent = 'Invalid username or password.';
+            loginError.style.display = 'block';
+          }
+        } else {
+            loginError.textContent = 'Username and password are required.';
+            loginError.style.display = 'block';
         }
       }
 
       loadCurrentUser();
     }
 
-    function login(username) {
-      localStorage.setItem('currentUser', username);
-      loadCurrentUser();
+    function login(username, password) {
+      let users = JSON.parse(localStorage.getItem('users')) || {};
+      // Simple hash function for demonstration purposes
+      const passHash = password.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0).toString();
+
+      if (users[username]) { // Login
+        if (users[username] === passHash) {
+          localStorage.setItem('currentUser', username);
+          loadCurrentUser();
+          return true;
+        }
+      } else { // Sign up
+        users[username] = passHash;
+        localStorage.setItem('users', JSON.stringify(users));
+        localStorage.setItem('currentUser', username);
+        loadCurrentUser();
+        return true;
+      }
+      return false;
     }
 
     function loadCurrentUser() {
