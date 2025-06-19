@@ -58,31 +58,68 @@
       const canvas = document.getElementById('canvas');
       const ctx = canvas.getContext('2d');
       
-      // Wait for video to be ready
+      // Wait for video to be ready and sized
       await new Promise(resolve => {
-        video.onloadeddata = () => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          resolve();
+        const checkVideo = () => {
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            resolve();
+          } else {
+            requestAnimationFrame(checkVideo);
+          }
         };
+        checkVideo();
       });
 
-      await tf.setBackend('webgl');
-      await tf.ready();
+      // Initialize TensorFlow
+      document.getElementById('reps').textContent = 'Initializing...';
+      try {
+        await tf.setBackend('webgl');
+        await tf.ready();
+        console.log('TensorFlow initialized with backend:', tf.getBackend());
+      } catch (error) {
+        console.error('TensorFlow initialization error:', error);
+        document.getElementById('reps').textContent = 'Error: Could not initialize TensorFlow';
+        return;
+      }
+      document.getElementById('reps').textContent = 'Loading pose detection...';
 
-      const detector = await poseDetection.createDetector(
-        poseDetection.SupportedModels.BlazePose,
-        { runtime: 'tfjs', modelType: 'full' }
-      );
+
+      let detector;
+      try {
+        detector = await poseDetection.createDetector(
+          poseDetection.SupportedModels.BlazePose,
+          { runtime: 'tfjs', modelType: 'full' }
+        );
+        console.log('Pose detector created successfully');
+        document.getElementById('reps').textContent = 'Reps: 0';
+      } catch (error) {
+        console.error('Pose detector creation error:', error);
+        document.getElementById('reps').textContent = 'Error: Could not initialize pose detection';
+        return;
+      }
 
       let reps = 0;
       let stage = null;
 
       function drawPoint(kp, color) {
+        if (!kp || typeof kp.x !== 'number' || typeof kp.y !== 'number') return;
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(kp.x, kp.y, 8, 0, 2 * Math.PI);
         ctx.fill();
+      }
+
+      function drawLine(kp1, kp2, color) {
+        if (!kp1 || !kp2 || typeof kp1.x !== 'number' || typeof kp1.y !== 'number' || 
+            typeof kp2.x !== 'number' || typeof kp2.y !== 'number') return;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(kp1.x, kp1.y);
+        ctx.lineTo(kp2.x, kp2.y);
+        ctx.stroke();
       }
 
       async function detect() {
@@ -110,10 +147,27 @@
           const wrist = kp.find(p => p.name === 'right_wrist');
           const shoulder = kp.find(p => p.name === 'right_shoulder');
 
-          // Draw all detected keypoints for debugging
+          // Draw skeleton lines first
+          const connections = [
+            ['left_shoulder', 'right_shoulder'],
+            ['left_shoulder', 'left_elbow'],
+            ['right_shoulder', 'right_elbow'],
+            ['left_elbow', 'left_wrist'],
+            ['right_elbow', 'right_wrist']
+          ];
+
+          connections.forEach(([p1Name, p2Name]) => {
+            const p1 = kp.find(p => p.name === p1Name);
+            const p2 = kp.find(p => p.name === p2Name);
+            if (p1 && p2 && p1.score > 0.3 && p2.score > 0.3) {
+              drawLine(p1, p2, '#4CAF50');
+            }
+          });
+
+          // Draw all detected keypoints
           kp.forEach(point => {
-            if (point.score > 0.3) {
-              drawPoint(point, 'yellow');
+            if (point && point.score > 0.3) {
+              drawPoint(point, point.name.includes('right_') ? '#FF5722' : '#2196F3');
             }
           });
 
@@ -121,8 +175,15 @@
             // Show confidence scores and coordinates
             ctx.fillStyle = 'white';
             ctx.font = '16px Arial';
-            ctx.fillText(`Wrist confidence: ${wrist.score.toFixed(2)} (${wrist.x.toFixed(0)}, ${wrist.y.toFixed(0)})`, 10, 40);
-            ctx.fillText(`Shoulder confidence: ${shoulder.score.toFixed(2)} (${shoulder.x.toFixed(0)}, ${shoulder.y.toFixed(0)})`, 10, 60);
+            const wristScore = wrist.score || 0;
+            const shoulderScore = shoulder.score || 0;
+            const wristX = wrist.x || 0;
+            const wristY = wrist.y || 0;
+            const shoulderX = shoulder.x || 0;
+            const shoulderY = shoulder.y || 0;
+            
+            ctx.fillText(`Wrist confidence: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, 40);
+            ctx.fillText(`Shoulder confidence: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, 60);
             
             if (wrist.score > 0.3 && shoulder.score > 0.3) {
               drawPoint(wrist, 'red');
