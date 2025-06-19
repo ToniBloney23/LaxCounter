@@ -81,6 +81,42 @@
         transform: translateY(-3px);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
     }
+
+    .focus-view h1,
+    .focus-view p,
+    .focus-view #controls-container,
+    .focus-view #menu-icon,
+    .focus-view #save-button,
+    .focus-view #reset-button,
+    .focus-view canvas,
+    .focus-view #nav-drawer {
+        display: none;
+    }
+
+    .focus-view #reps-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: #000;
+        z-index: 2000;
+    }
+
+    .focus-view #reps {
+        font-size: 25vw;
+        color: #4CAF50;
+    }
+
+    .focus-view #focus-mode-button {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 2001;
+    }
     .retry-button {
       font-size: 1rem;
       padding: 0.4rem 0.8rem;
@@ -281,6 +317,7 @@
     <canvas id="canvas"></canvas>
     <div id="controls-container">
       <button id="view-toggle">Show Dots</button>
+      <button id="focus-mode-button" class="control-button">Focus Mode</button>
     </div>
     <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
       Requesting camera access...
@@ -406,6 +443,13 @@
         viewToggleButton.addEventListener('click', () => {
             showDots = !showDots;
             viewToggleButton.textContent = showDots ? 'Hide Dots' : 'Show Dots';
+        });
+
+        const focusModeButton = document.getElementById('focus-mode-button');
+        focusModeButton.addEventListener('click', () => {
+            document.body.classList.toggle('focus-view');
+            const isFocus = document.body.classList.contains('focus-view');
+            focusModeButton.textContent = isFocus ? 'Exit Focus' : 'Focus Mode';
         });
 
         async function detect() {
