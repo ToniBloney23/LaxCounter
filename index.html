@@ -320,31 +320,34 @@
   <script>
     async function setupCamera() {
       const video = document.getElementById('video');
-      const cameraAccessGranted = localStorage.getItem('wallBallCameraAccess') === 'granted';
-      
-      document.getElementById('reps').textContent = 'Please allow camera access...';
-      document.getElementById('camera-status').style.display = 'block';
-      
-      if (cameraAccessGranted) {
-        document.getElementById('camera-status').innerHTML = 'Using saved camera permission...';
-      } else {
-        document.getElementById('camera-status').innerHTML = 'Requesting camera access...';
-      }
-      
+      const cameraStatus = document.getElementById('camera-status');
+      const repsDisplay = document.getElementById('reps');
+
+      repsDisplay.textContent = 'Initializing...';
+      cameraStatus.style.display = 'block';
+      cameraStatus.innerHTML = 'Checking camera permissions...';
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: 'user'
-          }
-        });
+        // Add a timeout for the getUserMedia request
+        const stream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                }
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out')), 10000))
+        ]);
+
         video.srcObject = stream;
         localStorage.setItem('wallBallCameraAccess', 'granted');
-        document.getElementById('camera-status').style.display = 'none';
+        cameraStatus.innerHTML = 'Camera access granted. Loading video...';
         
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Video load timeout')), 10000);
           video.onloadedmetadata = () => {
+            clearTimeout(timeout);
             video.width = video.videoWidth;
             video.height = video.videoHeight;
             resolve();
@@ -352,12 +355,15 @@
         });
 
         await video.play();
+        cameraStatus.style.display = 'none';
+        resetReps(); // Use resetReps to initialize counter and stage
         return video;
       } catch (err) {
         localStorage.setItem('wallBallCameraAccess', 'denied');
-        document.getElementById('camera-status').innerHTML = 
-          'Camera access denied or unavailable. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
-        console.error('Camera error:', err.message);
+        cameraStatus.innerHTML = 
+          `Camera access failed: ${err.message}. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>`;
+        repsDisplay.textContent = 'Camera Error';
+        console.error('Camera error:', err);
         throw err;
       }
     }
