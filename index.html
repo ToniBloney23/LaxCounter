@@ -66,6 +66,31 @@
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 
   <script>
+    // Create audio context and buffer for the counter sound
+    let audioContext;
+    let audioBuffer;
+
+    async function setupAudio() {
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const response = await fetch('https://cdn.freesound.org/previews/536/536108_11861866-lq.mp3');
+        const arrayBuffer = await response.arrayBuffer();
+        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        console.log('Audio setup complete');
+      } catch (error) {
+        console.error('Audio setup error:', error);
+      }
+    }
+
+    function playCounterSound() {
+      if (audioContext && audioBuffer) {
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        source.start();
+      }
+    }
+
     async function setupCamera() {
       const video = document.getElementById('video');
       try {
@@ -234,22 +259,25 @@
           const wrist = kp.find(p => p.name === 'right_wrist');
           const shoulder = kp.find(p => p.name === 'right_shoulder');
 
-          // Draw only arm skeleton lines
+          // Draw arm skeleton lines for both hands
           const connections = [
             ['right_shoulder', 'right_elbow'],
-            ['right_elbow', 'right_wrist']
+            ['right_elbow', 'right_wrist'],
+            ['left_shoulder', 'left_elbow'],
+            ['left_elbow', 'left_wrist']
           ];
 
           connections.forEach(([p1Name, p2Name]) => {
             const p1 = kp.find(p => p.name === p1Name);
             const p2 = kp.find(p => p.name === p2Name);
             if (p1 && p2 && p1.score > 0.3 && p2.score > 0.3) {
-              drawLine(p1, p2, '#4CAF50');
+              const color = p1Name.startsWith('right') ? '#FF5722' : '#2196F3';
+              drawLine(p1, p2, color);
             }
           });
 
-          // Draw only right arm keypoints
-          const armPoints = ['right_shoulder', 'right_elbow', 'right_wrist'];
+          // Draw both arm keypoints
+          const armPoints = ['right_shoulder', 'right_elbow', 'right_wrist', 'left_shoulder', 'left_elbow', 'left_wrist'];
           kp.forEach(point => {
             if (point && armPoints.includes(point.name)) {
               console.log(`Keypoint ${point.name}:`, {
@@ -260,45 +288,56 @@
               });
               
               if (point.score > 0.2) {
-                drawPoint(point, '#FF5722');
+                const color = point.name.startsWith('right') ? '#FF5722' : '#2196F3';
+                drawPoint(point, color);
               }
             }
           });
 
-          if (wrist && shoulder) {
-            // Show confidence scores and coordinates
-            ctx.fillStyle = 'white';
-            ctx.font = '16px Arial';
-            const wristScore = wrist.score || 0;
-            const shoulderScore = shoulder.score || 0;
-            const wristX = wrist.x || 0;
-            const wristY = wrist.y || 0;
-            const shoulderX = shoulder.x || 0;
-            const shoulderY = shoulder.y || 0;
-            
-            ctx.fillText(`Wrist confidence: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, 40);
-            ctx.fillText(`Shoulder confidence: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, 60);
-            
-            if (wrist.score > 0.3 && shoulder.score > 0.3) {
-              drawPoint(wrist, 'red');
-              drawPoint(shoulder, 'lime');
+          const leftWrist = kp.find(p => p.name === 'left_wrist');
+          const leftShoulder = kp.find(p => p.name === 'left_shoulder');
 
-              // Show vertical distance
-              const distance = wrist.y - shoulder.y;
-              ctx.fillText(`Vertical distance: ${distance.toFixed(0)}px`, 10, 80);
-              ctx.fillText(`Current stage: ${stage || 'none'}`, 10, 100);
+          // Show confidence scores and coordinates for both hands
+          ctx.fillStyle = 'white';
+          ctx.font = '16px Arial';
+          let y = 40;
 
-              // Check for lacrosse throwing motion
-              if (wrist.y < shoulder.y - 100) {
-                stage = 'ready';
+          [['Right', wrist, shoulder], ['Left', leftWrist, leftShoulder]].forEach(([side, w, s]) => {
+            if (w && s) {
+              const wristScore = w.score || 0;
+              const shoulderScore = s.score || 0;
+              const wristX = w.x || 0;
+              const wristY = w.y || 0;
+              const shoulderX = s.x || 0;
+              const shoulderY = s.y || 0;
+              
+              ctx.fillText(`${side} Wrist: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, y);
+              ctx.fillText(`${side} Shoulder: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, y + 20);
+              
+              if (w.score > 0.3 && s.score > 0.3) {
+                const distance = w.y - s.y;
+                ctx.fillText(`${side} distance: ${distance.toFixed(0)}px`, 10, y + 40);
+
+                // Check for throwing motion on either hand
+                if (w.y < s.y - 100) {
+                  stage = side.toLowerCase() + '_ready';
+                }
+                if (w.y > s.y + 30 && (stage === side.toLowerCase() + '_ready')) {
+                  reps++;
+                  stage = side.toLowerCase() + '_up';
+                  document.getElementById('reps').textContent = `Reps: ${reps}`;
+                  
+                  // Play sound every 10 reps
+                  if (reps % 10 === 0) {
+                    playCounterSound();
+                  }
+                }
               }
-              if (wrist.y > shoulder.y + 30 && stage === 'ready') {
-                reps++;
-                stage = 'up';
-                document.getElementById('reps').textContent = `Reps: ${reps}`;
-              }
+              y += 80;
             }
-          }
+          });
+
+          ctx.fillText(`Current stage: ${stage || 'none'}`, 10, y);
         }
 
         requestAnimationFrame(detect);
@@ -313,8 +352,9 @@
       document.getElementById('reps').textContent = 'Reps: 0';
     }
 
-    window.onload = () => {
+    window.onload = async () => {
       if (window.tf && window.poseDetection) {
+        await setupAudio();
         main();
       } else {
         alert('TensorFlow or poseDetection failed to load.');
