@@ -53,6 +53,14 @@
 </head>
 <body>
   <h1>Wall Ball Rep Tracker (Chrome)</h1>
+  <div id="controls-container" style="margin-bottom: 1rem;">
+    <label for="hand-select" style="margin-right: 0.5rem;">Track:</label>
+    <select id="hand-select" style="padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px;">
+      <option value="right">Right Hand</option>
+      <option value="left">Left Hand</option>
+      <option value="both">Both Hands</option>
+    </select>
+  </div>
   <div id="reps-container">
     <div id="reps">Reps: 0</div>
     <button id="reset-button" onclick="resetReps()">Reset</button>
@@ -66,31 +74,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 
   <script>
-    // Create audio context and buffer for the counter sound
-    let audioContext;
-    let audioBuffer;
-
-    async function setupAudio() {
-      try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const response = await fetch('https://cdn.freesound.org/previews/536/536108_11861866-lq.mp3');
-        const arrayBuffer = await response.arrayBuffer();
-        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        console.log('Audio setup complete');
-      } catch (error) {
-        console.error('Audio setup error:', error);
-      }
-    }
-
-    function playCounterSound() {
-      if (audioContext && audioBuffer) {
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        source.start();
-      }
-    }
-
     async function setupCamera() {
       const video = document.getElementById('video');
       try {
@@ -190,7 +173,11 @@
       }
 
       let reps = 0;
-      let stage = null;
+      let rightStage = null;
+      let leftStage = null;
+      let lastRepTime = 0;
+      const REP_COOLDOWN = 1000; // Minimum time (ms) between reps
+      let selectedHand = "right"; // Default to right hand tracking
 
       function drawPoint(kp, color) {
         if (!kp || typeof kp.x !== 'number' || typeof kp.y !== 'number') {
@@ -256,28 +243,36 @@
 
         if (poses.length > 0) {
           const kp = poses[0].keypoints;
-          const wrist = kp.find(p => p.name === 'right_wrist');
-          const shoulder = kp.find(p => p.name === 'right_shoulder');
-
-          // Draw arm skeleton lines for both hands
-          const connections = [
-            ['right_shoulder', 'right_elbow'],
-            ['right_elbow', 'right_wrist'],
-            ['left_shoulder', 'left_elbow'],
-            ['left_elbow', 'left_wrist']
-          ];
-
+          
+          // Get selected hand from dropdown
+          selectedHand = document.getElementById('hand-select').value;
+          
+          // Define connections and points based on selected hand
+          let connections = [];
+          let armPoints = [];
+          
+          if (selectedHand === 'right' || selectedHand === 'both') {
+            connections.push(['right_shoulder', 'right_elbow'], ['right_elbow', 'right_wrist']);
+            armPoints.push('right_shoulder', 'right_elbow', 'right_wrist');
+          }
+          
+          if (selectedHand === 'left' || selectedHand === 'both') {
+            connections.push(['left_shoulder', 'left_elbow'], ['left_elbow', 'left_wrist']);
+            armPoints.push('left_shoulder', 'left_elbow', 'left_wrist');
+          }
+          
+          // Draw arm skeleton lines
           connections.forEach(([p1Name, p2Name]) => {
             const p1 = kp.find(p => p.name === p1Name);
             const p2 = kp.find(p => p.name === p2Name);
             if (p1 && p2 && p1.score > 0.3 && p2.score > 0.3) {
-              const color = p1Name.startsWith('right') ? '#FF5722' : '#2196F3';
+              // Use different colors for right and left arms
+              const color = p1Name.includes('right') ? '#FF5722' : '#2196F3';
               drawLine(p1, p2, color);
             }
           });
 
-          // Draw both arm keypoints
-          const armPoints = ['right_shoulder', 'right_elbow', 'right_wrist', 'left_shoulder', 'left_elbow', 'left_wrist'];
+          // Draw arm keypoints
           kp.forEach(point => {
             if (point && armPoints.includes(point.name)) {
               console.log(`Keypoint ${point.name}:`, {
@@ -288,56 +283,115 @@
               });
               
               if (point.score > 0.2) {
-                const color = point.name.startsWith('right') ? '#FF5722' : '#2196F3';
+                // Use different colors for right and left keypoints
+                const color = point.name.includes('right') ? '#FF5722' : '#2196F3';
                 drawPoint(point, color);
               }
             }
           });
 
-          const leftWrist = kp.find(p => p.name === 'left_wrist');
-          const leftShoulder = kp.find(p => p.name === 'left_shoulder');
-
-          // Show confidence scores and coordinates for both hands
-          ctx.fillStyle = 'white';
-          ctx.font = '16px Arial';
-          let y = 40;
-
-          [['Right', wrist, shoulder], ['Left', leftWrist, leftShoulder]].forEach(([side, w, s]) => {
-            if (w && s) {
-              const wristScore = w.score || 0;
-              const shoulderScore = s.score || 0;
-              const wristX = w.x || 0;
-              const wristY = w.y || 0;
-              const shoulderX = s.x || 0;
-              const shoulderY = s.y || 0;
+          // Track rep counting based on selected hand
+          const currentTime = Date.now();
+          const timeSinceLastRep = currentTime - lastRepTime;
+          let textY = 40; // Starting Y position for text
+          
+          // Process right hand if selected
+          if (selectedHand === 'right' || selectedHand === 'both') {
+            const rightWrist = kp.find(p => p.name === 'right_wrist');
+            const rightShoulder = kp.find(p => p.name === 'right_shoulder');
+            
+            if (rightWrist && rightShoulder) {
+              // Show confidence scores and coordinates
+              ctx.fillStyle = 'white';
+              ctx.font = '16px Arial';
+              const wristScore = rightWrist.score || 0;
+              const shoulderScore = rightShoulder.score || 0;
+              const wristX = rightWrist.x || 0;
+              const wristY = rightWrist.y || 0;
+              const shoulderX = rightShoulder.x || 0;
+              const shoulderY = rightShoulder.y || 0;
               
-              ctx.fillText(`${side} Wrist: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, y);
-              ctx.fillText(`${side} Shoulder: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, y + 20);
+              ctx.fillText(`Right Wrist: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, textY);
+              textY += 20;
+              ctx.fillText(`Right Shoulder: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, textY);
+              textY += 20;
               
-              if (w.score > 0.3 && s.score > 0.3) {
-                const distance = w.y - s.y;
-                ctx.fillText(`${side} distance: ${distance.toFixed(0)}px`, 10, y + 40);
+              if (rightWrist.score > 0.3 && rightShoulder.score > 0.3) {
+                // Show vertical distance
+                const distance = rightWrist.y - rightShoulder.y;
+                ctx.fillText(`Right vertical distance: ${distance.toFixed(0)}px`, 10, textY);
+                textY += 20;
+                ctx.fillText(`Right stage: ${rightStage || 'none'}`, 10, textY);
+                textY += 20;
 
-                // Check for throwing motion on either hand
-                if (w.y < s.y - 100) {
-                  stage = side.toLowerCase() + '_ready';
+                // Check for lacrosse throwing motion
+                // Ready position: Hand must be significantly above shoulder
+                if (rightWrist.y < rightShoulder.y - 150 && rightWrist.score > 0.5 && rightShoulder.score > 0.5) {
+                  rightStage = 'ready';
                 }
-                if (w.y > s.y + 30 && (stage === side.toLowerCase() + '_ready')) {
+
+                // Follow through: Hand must move below shoulder with minimum time between reps
+                if (rightWrist.y > rightShoulder.y + 50 && 
+                    rightStage === 'ready' && 
+                    timeSinceLastRep > REP_COOLDOWN &&
+                    rightWrist.score > 0.5 && rightShoulder.score > 0.5) {
                   reps++;
-                  stage = side.toLowerCase() + '_up';
+                  rightStage = 'up';
+                  lastRepTime = currentTime;
                   document.getElementById('reps').textContent = `Reps: ${reps}`;
-                  
-                  // Play sound every 10 reps
-                  if (reps % 10 === 0) {
-                    playCounterSound();
-                  }
                 }
               }
-              y += 80;
             }
-          });
+          }
+          
+          // Process left hand if selected
+          if (selectedHand === 'left' || selectedHand === 'both') {
+            const leftWrist = kp.find(p => p.name === 'left_wrist');
+            const leftShoulder = kp.find(p => p.name === 'left_shoulder');
+            
+            if (leftWrist && leftShoulder) {
+              // Show confidence scores and coordinates
+              ctx.fillStyle = 'white';
+              ctx.font = '16px Arial';
+              const wristScore = leftWrist.score || 0;
+              const shoulderScore = leftShoulder.score || 0;
+              const wristX = leftWrist.x || 0;
+              const wristY = leftWrist.y || 0;
+              const shoulderX = leftShoulder.x || 0;
+              const shoulderY = leftShoulder.y || 0;
+              
+              ctx.fillText(`Left Wrist: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, textY);
+              textY += 20;
+              ctx.fillText(`Left Shoulder: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, textY);
+              textY += 20;
+              
+              if (leftWrist.score > 0.3 && leftShoulder.score > 0.3) {
+                // Show vertical distance
+                const distance = leftWrist.y - leftShoulder.y;
+                ctx.fillText(`Left vertical distance: ${distance.toFixed(0)}px`, 10, textY);
+                textY += 20;
+                ctx.fillText(`Left stage: ${leftStage || 'none'}`, 10, textY);
+                textY += 20;
 
-          ctx.fillText(`Current stage: ${stage || 'none'}`, 10, y);
+                // Check for lacrosse throwing motion
+                // Ready position: Hand must be significantly above shoulder
+                if (leftWrist.y < leftShoulder.y - 150 && leftWrist.score > 0.5 && leftShoulder.score > 0.5) {
+                  leftStage = 'ready';
+                }
+
+                // Follow through: Hand must move below shoulder with minimum time between reps
+                if (leftWrist.y > leftShoulder.y + 50 && 
+                    leftStage === 'ready' && 
+                    timeSinceLastRep > REP_COOLDOWN &&
+                    leftWrist.score > 0.5 && leftShoulder.score > 0.5) {
+                  reps++;
+                  leftStage = 'up';
+                  lastRepTime = currentTime;
+                  document.getElementById('reps').textContent = `Reps: ${reps}`;
+                }
+              }
+            }
+          }
         }
 
         requestAnimationFrame(detect);
@@ -348,14 +402,20 @@
 
     function resetReps() {
       reps = 0;
-      stage = null;
+      rightStage = null;
+      leftStage = null;
       document.getElementById('reps').textContent = 'Reps: 0';
     }
 
-    window.onload = async () => {
+    window.onload = () => {
       if (window.tf && window.poseDetection) {
-        await setupAudio();
         main();
+        
+        // Add event listener for hand selection change
+        document.getElementById('hand-select').addEventListener('change', function() {
+          // Reset rep counter when changing hands
+          resetReps();
+        });
       } else {
         alert('TensorFlow or poseDetection failed to load.');
       }
