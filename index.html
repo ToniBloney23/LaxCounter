@@ -174,10 +174,10 @@
         const REP_COOLDOWN = 1000; // Minimum time (ms) between reps
         
         // Start the detection loop
-        requestAnimationFrame(detect);
+        detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN);
     }
 
-    async function detect() {
+    async function detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN) {
         try {
             // Get video frame data
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -253,27 +253,16 @@
             console.error('Detection error:', error);
         }
         
-        requestAnimationFrame(detect);
-    }
-
-    // Initialize variables
-    let reps = 0;
-    let stickStage = null;
-    let lastRepTime = 0;
-    const REP_COOLDOWN = 1000; // Minimum time (ms) between reps
-    
-    detect();
+        requestAnimationFrame(() => detect(video, ctx, canvas, reps, stickStage, lastRepTime, REP_COOLDOWN));
     }
 
     function resetReps() {
       reps = 0;
-      rightStage = null;
-      leftStage = null;
+      stickStage = null;
       document.getElementById('reps').textContent = 'Reps: 0';
     }
 
     window.onload = () => {
-      if (window.tf && window.poseDetection) {
         main();
         
         // Load saved color preference
