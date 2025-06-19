@@ -37,6 +37,20 @@
     #reset-button:hover {
       background: #F4511E;
     }
+    .retry-button {
+      font-size: 1rem;
+      padding: 0.4rem 0.8rem;
+      background: #2196F3;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+      margin-left: 0.5rem;
+      transition: background 0.3s;
+    }
+    .retry-button:hover {
+      background: #1976D2;
+    }
     video {
       display: none;
     }
@@ -65,6 +79,9 @@
     <div id="reps">Reps: 0</div>
     <button id="reset-button" onclick="resetReps()">Reset</button>
   </div>
+  <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
+    Requesting camera access...
+  </div>
   <video id="video" autoplay playsinline muted style="display: none;"></video>
   <canvas id="canvas"></canvas>
 
@@ -76,6 +93,11 @@
   <script>
     async function setupCamera() {
       const video = document.getElementById('video');
+      
+      // Show camera permission request message
+      document.getElementById('reps').textContent = 'Please allow camera access...';
+      document.getElementById('camera-status').style.display = 'block';
+      
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -85,6 +107,9 @@
           }
         });
         video.srcObject = stream;
+        
+        // Hide camera permission message once access is granted
+        document.getElementById('camera-status').style.display = 'none';
         
         // Wait for video to be fully loaded
         await new Promise((resolve) => {
@@ -104,9 +129,18 @@
         await video.play();
         return video;
       } catch (err) {
-        alert('Camera access denied or unavailable: ' + err.message);
+        document.getElementById('camera-status').innerHTML = 
+          'Camera access denied or unavailable. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
+        console.error('Camera error:', err.message);
         throw err;
       }
+    }
+    
+    function requestCameraAgain() {
+      document.getElementById('camera-status').innerHTML = 'Requesting camera access...';
+      main().catch(err => {
+        console.error('Failed to initialize after retry:', err);
+      });
     }
 
     async function main() {
@@ -177,7 +211,12 @@
       let leftStage = null;
       let lastRepTime = 0;
       const REP_COOLDOWN = 1000; // Minimum time (ms) between reps
-      let selectedHand = "right"; // Default to right hand tracking
+      
+      // Get saved hand preference from localStorage or default to right
+      let selectedHand = localStorage.getItem('wallBallSelectedHand') || "right";
+      
+      // Update dropdown to match saved preference
+      document.getElementById('hand-select').value = selectedHand;
 
       function drawPoint(kp, color) {
         if (!kp || typeof kp.x !== 'number' || typeof kp.y !== 'number') {
@@ -413,6 +452,10 @@
         
         // Add event listener for hand selection change
         document.getElementById('hand-select').addEventListener('change', function() {
+          // Save selection to localStorage
+          selectedHand = this.value;
+          localStorage.setItem('wallBallSelectedHand', selectedHand);
+          
           // Reset rep counter when changing hands
           resetReps();
         });
