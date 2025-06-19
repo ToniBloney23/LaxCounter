@@ -104,6 +104,54 @@
       display: block;
       margin: 1rem auto;
     }
+    .control-button {
+        font-size: 1rem;
+        padding: 0.6rem 1.2rem;
+        border: none;
+        border-radius: 5px;
+        color: white;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        background: #2196F3;
+    }
+    .control-button:hover {
+        background: #1976D2;
+        transform: translateY(-2px);
+    }
+    .modal {
+        position: fixed; 
+        z-index: 1; 
+        left: 0;
+        top: 0;
+        width: 100%; 
+        height: 100%; 
+        overflow: auto; 
+        background-color: rgba(0,0,0,0.6);
+    }
+    .modal-content {
+        background-color: #2c2c2c;
+        margin: 15% auto; 
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%;
+        max-width: 400px;
+        border-radius: 10px;
+        text-align: center;
+    }
+    .close-button {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+    .close-button:hover,
+    .close-button:focus {
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -113,6 +161,13 @@
     <div id="reps-container">
       <div id="reps">Reps: 0</div>
       <button id="reset-button" onclick="resetReps()">Reset</button>
+      <button id="save-button" class="control-button">Save</button>
+    </div>
+    <div id="user-container" style="margin-top: 1rem;">
+      <span id="user-greeting"></span>
+      <button id="login-button" class="control-button">Login/Sign Up</button>
+      <button id="leaderboard-button" class="control-button">Leaderboard</button>
+      <button id="session-history-button" class="control-button">History</button>
     </div>
     <canvas id="canvas"></canvas>
     <div id="controls-container">
@@ -122,6 +177,32 @@
       Requesting camera access...
     </div>
     <video id="video" autoplay playsinline muted style="display: none;"></video>
+    <div id="notification" style="display:none; position: fixed; top: 20px; right: 20px; background-color: #4CAF50; color: white; padding: 15px; border-radius: 5px; z-index: 1000;"></div>
+  </div>
+
+  <div id="login-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Login or Sign Up</h2>
+      <input type="text" id="username-input" placeholder="Enter your username">
+      <button id="login-submit">Go</button>
+    </div>
+  </div>
+
+  <div id="leaderboard-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Leaderboard</h2>
+      <ol id="leaderboard-list"></ol>
+    </div>
+  </div>
+
+  <div id="session-history-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Session History</h2>
+      <ul id="session-history-list"></ul>
+    </div>
   </div>
   <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg"></audio>
 
@@ -258,7 +339,152 @@
 
     window.onload = () => {
         main().catch(console.error);
+        setupUI();
     };
+
+    window.onbeforeunload = () => {
+        // This can be left empty or removed if you only want manual saving
+    };
+
+    function setupUI() {
+      const loginModal = document.getElementById('login-modal');
+      const leaderboardModal = document.getElementById('leaderboard-modal');
+      const sessionHistoryModal = document.getElementById('session-history-modal');
+      const loginButton = document.getElementById('login-button');
+      const leaderboardButton = document.getElementById('leaderboard-button');
+      const sessionHistoryButton = document.getElementById('session-history-button');
+      const saveButton = document.getElementById('save-button');
+      const closeButtons = document.querySelectorAll('.close-button');
+
+      loginButton.onclick = () => loginModal.style.display = 'block';
+      leaderboardButton.onclick = () => {
+        updateLeaderboard();
+        leaderboardModal.style.display = 'block';
+      }
+
+      sessionHistoryButton.onclick = () => {
+        updateSessionHistory();
+        sessionHistoryModal.style.display = 'block';
+      }
+
+      saveButton.onclick = () => {
+        saveSession();
+        showNotification('Session saved!');
+      }
+
+      closeButtons.forEach(btn => {
+        btn.onclick = () => {
+          loginModal.style.display = 'none';
+          leaderboardModal.style.display = 'none';
+          sessionHistoryModal.style.display = 'none';
+        }
+      });
+
+      window.onclick = (event) => {
+        if (event.target == loginModal || event.target == leaderboardModal || event.target == sessionHistoryModal) {
+          loginModal.style.display = 'none';
+          leaderboardModal.style.display = 'none';
+          sessionHistoryModal.style.display = 'none';
+        }
+      }
+
+      document.getElementById('login-submit').onclick = () => {
+        const username = document.getElementById('username-input').value.trim();
+        if (username) {
+          login(username);
+          loginModal.style.display = 'none';
+        }
+      }
+
+      loadCurrentUser();
+    }
+
+    function login(username) {
+      localStorage.setItem('currentUser', username);
+      loadCurrentUser();
+    }
+
+    function loadCurrentUser() {
+      const username = localStorage.getItem('currentUser');
+      if (username) {
+        document.getElementById('user-greeting').textContent = `Welcome, ${username}`;
+        document.getElementById('login-button').textContent = 'Logout';
+        document.getElementById('login-button').onclick = logout;
+      } else {
+        document.getElementById('user-greeting').textContent = '';
+        document.getElementById('login-button').textContent = 'Login/Sign Up';
+        document.getElementById('login-button').onclick = () => document.getElementById('login-modal').style.display = 'block';
+      }
+    }
+
+    function logout() {
+      saveSession();
+      localStorage.removeItem('currentUser');
+      loadCurrentUser();
+    }
+
+    function saveSession() {
+      const username = localStorage.getItem('currentUser');
+      if (!username || reps === 0) return;
+
+      let sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      if (!sessions[username]) {
+          sessions[username] = [];
+      }
+
+      const highscore = sessions[username].reduce((max, session) => Math.max(max, session.reps), 0);
+      if (reps > highscore) {
+          showNotification('New high score!');
+      }
+
+      sessions[username].push({ date: new Date().toISOString(), reps: reps });
+      localStorage.setItem('sessions', JSON.stringify(sessions));
+    }
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.display = 'block';
+      setTimeout(() => {
+        notification.style.display = 'none';
+      }, 3000);
+    }
+
+    function updateLeaderboard() {
+      const sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      const leaderboardList = document.getElementById('leaderboard-list');
+      leaderboardList.innerHTML = '';
+
+      const highScores = Object.entries(sessions).map(([name, userSessions]) => {
+          const maxReps = userSessions.reduce((max, session) => Math.max(max, session.reps), 0);
+          return { name, score: maxReps };
+      });
+
+      highScores.sort((a, b) => b.score - a.score);
+
+      highScores.forEach(({ name, score }) => {
+          const li = document.createElement('li');
+          li.textContent = `${name}: ${score}`;
+          leaderboardList.appendChild(li);
+      });
+    }
+
+    function updateSessionHistory() {
+      const username = localStorage.getItem('currentUser');
+      const sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      const userSessions = sessions[username] || [];
+      const sessionList = document.getElementById('session-history-list');
+      sessionList.innerHTML = '';
+
+      userSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      userSessions.forEach(session => {
+          const li = document.createElement('li');
+          const date = new Date(session.date);
+          li.textContent = `Date: ${date.toLocaleDateString()}, Time: ${date.toLocaleTimeString()}, Reps: ${session.reps}`;
+          sessionList.appendChild(li);
+      });
+    }
   </script>
 </body>
 </html>
