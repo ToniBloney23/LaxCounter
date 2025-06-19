@@ -22,8 +22,12 @@
     }
     video, canvas {
       max-width: 100%;
+      width: 640px;
+      height: 480px;
       border-radius: 10px;
       box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+      display: block;
+      margin: 0 auto;
     }
   </style>
 </head>
@@ -42,10 +46,31 @@
     async function setupCamera() {
       const video = document.getElementById('video');
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          }
+        });
         video.srcObject = stream;
-        await new Promise(resolve => (video.onloadedmetadata = resolve));
-        video.play();
+        
+        // Wait for video to be fully loaded
+        await new Promise((resolve) => {
+          video.onloadedmetadata = () => {
+            video.width = video.videoWidth;
+            video.height = video.videoHeight;
+            console.log('Video metadata loaded:', {
+              width: video.width,
+              height: video.height,
+              videoWidth: video.videoWidth,
+              videoHeight: video.videoHeight
+            });
+            resolve();
+          };
+        });
+
+        await video.play();
         return video;
       } catch (err) {
         alert('Camera access denied or unavailable: ' + err.message);
@@ -57,19 +82,35 @@
       const video = await setupCamera();
       const canvas = document.getElementById('canvas');
       const ctx = canvas.getContext('2d');
+
+      // Log video element properties
+      console.log('Video element:', {
+        offsetWidth: video.offsetWidth,
+        offsetHeight: video.offsetHeight,
+        clientWidth: video.clientWidth,
+        clientHeight: video.clientHeight,
+        style: video.style.cssText
+      });
       
-      // Wait for video to be ready and sized
-      await new Promise(resolve => {
-        const checkVideo = () => {
-          if (video.videoWidth > 0 && video.videoHeight > 0) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            resolve();
-          } else {
-            requestAnimationFrame(checkVideo);
-          }
-        };
-        checkVideo();
+      // Set canvas dimensions to match video
+      canvas.width = video.width;
+      canvas.height = video.height;
+      
+      // Log canvas dimensions
+      console.log('Canvas dimensions set:', {
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+        drawingBufferWidth: ctx.drawingBufferWidth,
+        drawingBufferHeight: ctx.drawingBufferHeight
+      });
+
+      // Test drawing video frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      console.log('Image data retrieved:', {
+        width: imageData.width,
+        height: imageData.height,
+        dataLength: imageData.data.length
       });
 
       // Initialize TensorFlow
@@ -104,11 +145,19 @@
       let stage = null;
 
       function drawPoint(kp, color) {
-        if (!kp || typeof kp.x !== 'number' || typeof kp.y !== 'number') return;
+        if (!kp || typeof kp.x !== 'number' || typeof kp.y !== 'number') {
+          console.log('Invalid keypoint:', kp);
+          return;
+        }
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(kp.x, kp.y, 8, 0, 2 * Math.PI);
         ctx.fill();
+        
+        // Draw coordinate text
+        ctx.fillStyle = 'white';
+        ctx.font = '12px Arial';
+        ctx.fillText(`(${Math.round(kp.x)},${Math.round(kp.y)})`, kp.x + 10, kp.y);
       }
 
       function drawLine(kp1, kp2, color) {
@@ -125,10 +174,25 @@
       async function detect() {
         let poses = [];
         try {
+          // Log video dimensions and readiness
+          console.log('Video state:', {
+            width: video.videoWidth,
+            height: video.videoHeight,
+            ready: video.readyState,
+            time: video.currentTime
+          });
+
           poses = await detector.estimatePoses(video, {
             flipHorizontal: false,
             maxPoses: 1,
-            scoreThreshold: 0.3
+            scoreThreshold: 0.2,
+            modelType: 'full'
+          });
+
+          // Log pose detection results
+          console.log('Pose detection result:', {
+            posesLength: poses.length,
+            firstPoseKeypoints: poses[0]?.keypoints?.length || 0
           });
         } catch (error) {
           console.error('Pose detection error:', error);
@@ -164,10 +228,19 @@
             }
           });
 
-          // Draw all detected keypoints
+          // Draw all detected keypoints with scores
           kp.forEach(point => {
-            if (point && point.score > 0.3) {
-              drawPoint(point, point.name.includes('right_') ? '#FF5722' : '#2196F3');
+            if (point) {
+              console.log(`Keypoint ${point.name}:`, {
+                x: point.x,
+                y: point.y,
+                score: point.score,
+                visible: point.score > 0.2
+              });
+              
+              if (point.score > 0.2) {
+                drawPoint(point, point.name.includes('right_') ? '#FF5722' : '#2196F3');
+              }
             }
           });
 
