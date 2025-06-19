@@ -84,12 +84,13 @@
 
     .focus-view h1,
     .focus-view p,
-    .focus-view #controls-container,
     .focus-view #menu-icon,
     .focus-view #save-button,
     .focus-view #reset-button,
     .focus-view canvas,
-    .focus-view #nav-drawer {
+    .focus-view #nav-drawer,
+    .focus-view #view-toggle,
+    .focus-view #focus-mode-button {
         display: none;
     }
 
@@ -447,9 +448,20 @@
 
         const focusModeButton = document.getElementById('focus-mode-button');
         focusModeButton.addEventListener('click', () => {
-            document.body.classList.toggle('focus-view');
-            const isFocus = document.body.classList.contains('focus-view');
-            focusModeButton.textContent = isFocus ? 'Exit Focus' : 'Focus Mode';
+            document.body.classList.add('focus-view');
+        });
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && document.body.classList.contains('focus-view')) {
+                document.body.classList.remove('focus-view');
+                document.getElementById('focus-mode-button').textContent = 'Focus Mode';
+            }
+        });
+
+        document.getElementById('reps-container').addEventListener('click', () => {
+            if (document.body.classList.contains('focus-view')) {
+                document.body.classList.remove('focus-view');
+            }
         });
 
         async function detect() {
