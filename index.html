@@ -234,12 +234,9 @@
           const wrist = kp.find(p => p.name === 'right_wrist');
           const shoulder = kp.find(p => p.name === 'right_shoulder');
 
-          // Draw skeleton lines first
+          // Draw only arm skeleton lines
           const connections = [
-            ['left_shoulder', 'right_shoulder'],
-            ['left_shoulder', 'left_elbow'],
             ['right_shoulder', 'right_elbow'],
-            ['left_elbow', 'left_wrist'],
             ['right_elbow', 'right_wrist']
           ];
 
@@ -251,9 +248,10 @@
             }
           });
 
-          // Draw all detected keypoints with scores
+          // Draw only right arm keypoints
+          const armPoints = ['right_shoulder', 'right_elbow', 'right_wrist'];
           kp.forEach(point => {
-            if (point) {
+            if (point && armPoints.includes(point.name)) {
               console.log(`Keypoint ${point.name}:`, {
                 x: point.x,
                 y: point.y,
@@ -262,7 +260,7 @@
               });
               
               if (point.score > 0.2) {
-                drawPoint(point, point.name.includes('right_') ? '#FF5722' : '#2196F3');
+                drawPoint(point, '#FF5722');
               }
             }
           });
@@ -290,10 +288,11 @@
               ctx.fillText(`Vertical distance: ${distance.toFixed(0)}px`, 10, 80);
               ctx.fillText(`Current stage: ${stage || 'none'}`, 10, 100);
 
-              if (wrist.y > shoulder.y + 50) {
-                stage = 'down';
+              // Check for lacrosse throwing motion
+              if (wrist.y < shoulder.y - 100) {
+                stage = 'ready';
               }
-              if (wrist.y < shoulder.y - 20 && stage === 'down') {
+              if (wrist.y > shoulder.y + 30 && stage === 'ready') {
                 reps++;
                 stage = 'up';
                 document.getElementById('reps').textContent = `Reps: ${reps}`;
