@@ -4,42 +4,79 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Wall Ball Rep Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
   <style>
     body {
-      background: #121212;
-      color: #fff;
-      text-align: center;
-      font-family: sans-serif;
+      background: #1a1a1a;
+      color: #f0f0f0;
+      font-family: 'Roboto', sans-serif;
       margin: 0;
-      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
     }
     h1 {
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
+      font-size: 2.5rem;
+      color: #4CAF50;
+    }
+    p {
+      margin-bottom: 2rem;
+      font-size: 1.1rem;
+      color: #ccc;
     }
     #reps-container {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
+      font-size: 3rem;
+      margin-bottom: 1.5rem;
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 1rem;
+      gap: 1.5rem;
+      background: #2c2c2c;
+      padding: 1rem 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
-    #reset-button {
-      font-size: 1.2rem;
-      padding: 0.5rem 1rem;
-      background: #FF5722;
+    #reset-button, #view-toggle {
+      font-size: 1rem;
+      padding: 0.6rem 1.2rem;
       border: none;
       border-radius: 5px;
       color: white;
       cursor: pointer;
-      transition: background 0.3s;
+      transition: background-color 0.3s, transform 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
+
+    #reset-button {
+      background: #f44336;
+    }
+
     #reset-button:hover {
-      background: #F4511E;
+      background: #d32f2f;
+      transform: translateY(-2px);
+    }
+
+    #controls-container {
+      margin-top: 1.5rem;
+    }
+
+    #view-toggle {
+        background: #2196F3;
+    }
+
+    #view-toggle:hover {
+        background: #1976D2;
+        transform: translateY(-2px);
     }
     .retry-button {
       font-size: 1rem;
@@ -63,26 +100,29 @@
       width: 640px;
       height: 480px;
       border-radius: 10px;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
       display: block;
-      margin: 0 auto;
+      margin: 1rem auto;
     }
   </style>
 </head>
 <body>
-  <h1>Wall Ball Rep Tracker (Chrome)</h1>
-  <div id="controls-container" style="margin-bottom: 1rem;">
-    <button id="view-toggle" style="margin-left: 1rem; padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">Show Dots</button>
+  <div class="container">
+    <h1>Wall Ball Rep Tracker</h1>
+    <p>Use your camera to count your wall ball reps automatically.</p>
+    <div id="reps-container">
+      <div id="reps">Reps: 0</div>
+      <button id="reset-button" onclick="resetReps()">Reset</button>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div id="controls-container">
+      <button id="view-toggle">Show Dots</button>
+    </div>
+    <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
+      Requesting camera access...
+    </div>
+    <video id="video" autoplay playsinline muted style="display: none;"></video>
   </div>
-  <div id="reps-container">
-    <div id="reps">Reps: 0</div>
-    <button id="reset-button" onclick="resetReps()">Reset</button>
-  </div>
-  <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
-    Requesting camera access...
-  </div>
-  <video id="video" autoplay playsinline muted style="display: none;"></video>
-  <canvas id="canvas"></canvas>
   <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg"></audio>
 
   <script>
@@ -188,10 +228,10 @@
                     }
                     const distance = Math.abs(wrist.y - shoulder.y);
 
-                    if (distance < 50) { // Hand is up
+                    if (distance < 70) { // Hand is up
                         stage = 'up';
                     }
-                    if (distance > 100 && stage === 'up') { // Hand is down
+                    if (distance > 120 && stage === 'up') { // Hand is down
                         stage = 'down';
                         reps++;
                         document.getElementById('reps').textContent = `Reps: ${reps}`;
