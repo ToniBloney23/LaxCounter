@@ -118,17 +118,81 @@
         z-index: 3000;
     }
     #menu-icon {
-        font-size: 2rem;
+        font-size: 1.5rem;
         cursor: pointer;
+        background: #2c2c2c;
+        padding: 0.5rem 0.8rem;
+        border-radius: 50%;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        transition: all 0.2s ease-in-out;
+    }
+    #menu-icon:hover {
+        transform: scale(1.1);
     }
     #menu-items {
         display: none;
+        position: absolute;
+        right: 0;
+        top: 60px;
         background-color: #2c2c2c;
-        padding: 1rem;
-        border-radius: 5px;
+        padding: 0.5rem 0;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        width: 250px;
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #hamburger-menu.menu-open #menu-items {
+        display: block;
+        opacity: 1;
+        transform: translateY(0);
     }
     .menu-item {
-        padding: 0.5rem;
+        padding: 0.8rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    .menu-item:hover {
+        background-color: #414345;
+    }
+    .menu-item label {
+        cursor: pointer;
+    }
+    /* Custom Toggle Switch */
+    .menu-item input[type="checkbox"] {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .toggle-switch {
+        height: 24px;
+        width: 44px;
+        background-color: #555;
+        border-radius: 12px;
+        position: relative;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    .toggle-switch::before {
+        content: '';
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        border-radius: 50%;
+        transition: transform 0.2s ease;
+    }
+    input:checked + .toggle-switch {
+        background-color: #4CAF50;
+    }
+    input:checked + .toggle-switch::before {
+        transform: translateX(20px);
     }
     #account-modal {
         position: fixed;
@@ -163,11 +227,17 @@
         <div class="menu-item" id="history-label">History</div>
         <div class="menu-item">
             <label for="toggle-detection">Show Ball Detection</label>
-            <input type="checkbox" id="toggle-detection">
+            <label class="toggle-label">
+                <input type="checkbox" id="toggle-detection">
+                <span class="toggle-switch"></span>
+            </label>
         </div>
         <div class="menu-item">
             <label for="toggle-rpm">Show RPM</label>
-            <input type="checkbox" id="toggle-rpm">
+            <label class="toggle-label">
+                <input type="checkbox" id="toggle-rpm">
+                <span class="toggle-switch"></span>
+            </label>
         </div>
     </div>
   </div>
@@ -306,9 +376,18 @@
             tracker.ballState = 'waiting';
         });
 
-        document.getElementById('menu-icon').addEventListener('click', () => {
-            const menuItems = document.getElementById('menu-items');
-            menuItems.style.display = menuItems.style.display === 'block' ? 'none' : 'block';
+        const hamburgerMenu = document.getElementById('hamburger-menu');
+        const menuIcon = document.getElementById('menu-icon');
+
+        menuIcon.addEventListener('click', (event) => {
+            hamburgerMenu.classList.toggle('menu-open');
+            event.stopPropagation();
+        });
+
+        window.addEventListener('click', (e) => {
+            if (hamburgerMenu.classList.contains('menu-open') && !hamburgerMenu.contains(e.target)) {
+                hamburgerMenu.classList.remove('menu-open');
+            }
         });
 
         document.getElementById('toggle-detection').addEventListener('change', (e) => {
