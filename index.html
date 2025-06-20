@@ -485,18 +485,10 @@
               <span class="slider round"></span>
             </label>
           </div>
-          <div class="toggle-switch-container">
-            <label for="sound-toggle">Sound</label>
-            <label class="switch">
-              <input type="checkbox" id="sound-toggle" checked>
-              <span class="slider round"></span>
-            </label>
-          </div>
         </div>
     </div>
     <canvas id="canvas"></canvas>
     <div id="controls-container">
-      <button id="reset-button" class="control-button">Reset</button>
       <button id="focus-mode-button" class="control-button">Focus Mode</button>
     </div>
     <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
@@ -532,11 +524,10 @@
       <ul id="session-history-list"></ul>
     </div>
   </div>
-  <audio id="rep-sound" src="https://cdn.pixabay.com/download/audio/2022/10/26/audio_c346a8ca9b.mp3?filename=tennis-ball-hit-121292.mp3" preload="auto"></audio>
+  <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg" preload="auto"></audio>
 
   <script>
     async function setupCamera() {
-      console.log('setupCamera: start');
       const video = document.getElementById('video');
       const cameraStatus = document.getElementById('camera-status');
       const repsDisplay = document.getElementById('reps');
@@ -545,17 +536,7 @@
       cameraStatus.style.display = 'block';
       cameraStatus.innerHTML = 'Checking camera permissions...';
 
-      // Check if getUserMedia is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        const errorMessage = 'Camera API not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.';
-        cameraStatus.innerHTML = errorMessage + ' <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
-        repsDisplay.textContent = 'Browser Not Supported';
-        console.error('getUserMedia not supported');
-        throw new Error('getUserMedia not supported');
-      }
-
       try {
-        console.log('Requesting camera access...');
         // Add a timeout for the getUserMedia request
         const stream = await Promise.race([
             navigator.mediaDevices.getUserMedia({
@@ -566,78 +547,32 @@
                     frameRate: { ideal: 60 }
                 }
             }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out after 10 seconds')), 10000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out')), 10000))
         ]);
 
-        console.log('Camera stream obtained, setting up video...');
         video.srcObject = stream;
         localStorage.setItem('wallBallCameraAccess', 'granted');
         cameraStatus.innerHTML = 'Camera access granted. Loading video...';
         
         await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Video metadata load timeout after 10 seconds')), 10000);
+          const timeout = setTimeout(() => reject(new Error('Video load timeout')), 10000);
           video.onloadedmetadata = () => {
-            console.log('Video metadata loaded:', video.videoWidth, 'x', video.videoHeight);
             clearTimeout(timeout);
             video.width = video.videoWidth;
             video.height = video.videoHeight;
             resolve();
           };
-          video.onerror = (e) => {
-            clearTimeout(timeout);
-            reject(new Error('Video element error: ' + e.message));
-          };
         });
 
-        console.log('Starting video playback...');
         await video.play();
         cameraStatus.style.display = 'none';
-        console.log('setupCamera: success');
         return video;
       } catch (err) {
         localStorage.setItem('wallBallCameraAccess', 'denied');
-        console.error('Detailed camera error:', {
-          name: err.name,
-          message: err.message,
-          stack: err.stack
-        });
-        
-        let errorMessage = `Camera Error: ${err.message}`;
-        let suggestions = '';
-        
-        if (err.name === 'NotAllowedError') {
-            suggestions = '<br><strong>Solution:</strong> Grant camera permissions in your browser and refresh the page.';
-        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-            suggestions = '<br><strong>Solution:</strong> Connect a camera and ensure it\'s enabled in device settings.';
-        } else if (err.name === 'NotReadableError' || err.message.includes('in use')) {
-            suggestions = '<br><strong>Solution:</strong> Close other applications using the camera (Zoom, Skype, etc.).';
-        } else if (err.message.includes('timeout')) {
-            suggestions = '<br><strong>Solution:</strong> Check your camera connection and try again.';
-        } else if (err.name === 'OverconstrainedError') {
-            suggestions = '<br><strong>Solution:</strong> Your camera doesn\'t support the requested resolution. Trying with lower settings...';
-            // Try with lower constraints
-            try {
-              console.log('Retrying with lower camera constraints...');
-              const fallbackStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480 }
-              });
-              video.srcObject = fallbackStream;
-              await video.play();
-              cameraStatus.style.display = 'none';
-              console.log('setupCamera: success with fallback');
-              return video;
-            } catch (fallbackErr) {
-              console.error('Fallback also failed:', fallbackErr);
-              suggestions = '<br><strong>Solution:</strong> Camera constraints not supported. Please try a different camera.';
-            }
-        } else {
-            suggestions = '<br><strong>Suggestions:</strong> Refresh the page, check camera permissions, or try a different browser.';
-        }
-        
-        errorMessage += suggestions + ' <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
-        
-        cameraStatus.innerHTML = errorMessage;
+        cameraStatus.innerHTML = 
+          `Camera access failed: ${err.message}. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>`;
         repsDisplay.textContent = 'Camera Error';
+        console.error('Camera error:', err);
         throw err;
       }
     }
@@ -666,41 +601,14 @@
 
     }
 
-    let reps = 0;
-    let stage = null;
-    let startTime = null;
-
     async function main() {
-        console.log('main: start');
         const video = await setupCamera();
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = video.width;
         canvas.height = video.height;
 
-        let detector;
-        try {
-            console.log('Initializing pose detector...');
-            // Try BlazePose with TensorFlow.js backend first (more reliable)
-            detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
-                runtime: 'tfjs',
-                modelType: 'lite'
-            });
-            console.log('Pose detector initialized successfully with TensorFlow.js backend');
-        } catch (tfError) {
-            console.warn('TensorFlow.js backend failed, trying MediaPipe:', tfError);
-            try {
-                // Fallback to MediaPipe with alternative CDN
-                detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
-                    runtime: 'mediapipe',
-                    solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404'
-                });
-                console.log('Pose detector initialized with MediaPipe backend');
-            } catch (mpError) {
-                console.error('Both pose detection backends failed:', { tfError, mpError });
-                throw new Error('Pose detection initialization failed. Please refresh the page.');
-            }
-        }
+        const detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'mediapipe', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose' });
 
         let showDots = false;
 
@@ -715,13 +623,10 @@
             document.body.classList.add('focus-view');
         });
 
-        const resetButton = document.getElementById('reset-button');
-        resetButton.addEventListener('click', resetReps);
-
         const goalInput = document.getElementById('goal-input');
         const progressBar = document.getElementById('progress-bar');
         let goal = parseInt(goalInput.value);
-        updateProgressBar();
+        resetReps();
 
         goalInput.addEventListener('input', () => {
             goal = parseInt(goalInput.value);
@@ -745,15 +650,7 @@
             progressBar.style.width = `${Math.min(progress, 100)}%`;
         }
 
-
-
-        const soundToggle = document.getElementById('sound-toggle');
-        const repSound = document.getElementById('rep-sound');
-
-        soundToggle.addEventListener('change', () => {
-            repSound.muted = !soundToggle.checked;
-        });
-
+        let startTime = null;
         const timerDisplay = document.getElementById('timer');
         const rpmDisplay = document.getElementById('rpm');
 
@@ -782,7 +679,6 @@
         });
 
         async function detect() {
-            console.log('detect: start');
             const poses = await detector.estimatePoses(video);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -796,54 +692,27 @@
                 const wrist = keypoints.find(k => k.name === `${handToTrack}_wrist`);
                 const shoulder = keypoints.find(k => k.name === `${handToTrack}_shoulder`);
 
-                const leftHip = keypoints.find(k => k.name === 'left_hip');
-                const rightHip = keypoints.find(k => k.name === 'right_hip');
-                const leftKnee = keypoints.find(k => k.name === 'left_knee');
-                const rightKnee = keypoints.find(k => k.name === 'right_knee');
-
-                if (wrist && shoulder && leftHip && rightHip && leftKnee && rightKnee &&
-                    wrist.score > 0.5 && shoulder.score > 0.5 && leftHip.score > 0.5 &&
-                    rightHip.score > 0.5 && leftKnee.score > 0.5 && rightKnee.score > 0.5) {
-
+                if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
                     if (showDots) {
                         drawKeypoints(keypoints, ctx);
                     }
 
-                    const hipY = (leftHip.y + rightHip.y) / 2;
-                    const kneeY = (leftKnee.y + rightKnee.y) / 2;
-
-                    // State machine for rep counting
-                    switch (stage) {
-                        case 'start':
-                            if (hipY > kneeY) { // Squat down
-                                stage = 'squat_down';
-                            }
-                            break;
-                        case 'squat_down':
-                            if (hipY < kneeY) { // Stand up
-                                stage = 'squat_up';
-                            }
-                            break;
-                        case 'squat_up':
-                            if (wrist.y < shoulder.y - 15) { // Throw
-                                if (!startTime) {
-                                    startTime = Date.now();
-                                }
-                                reps++;
-                                document.getElementById('reps').textContent = 'Reps: ' + reps;
-                                if (soundToggle.checked) {
-                                    const repSound = document.getElementById('rep-sound');
-                                    repSound.currentTime = 0;
-                                    repSound.play().catch(e => console.error('Error playing sound:', e));
-                                }
-                                updateProgressBar();
-                                stage = 'start'; // Reset for next rep
-                            }
-                            break;
+                    if (wrist.y < shoulder.y - 15) { // Hand is above the shoulder
+                        stage = 'up';
+                    } else if (wrist.y > shoulder.y && stage === 'up') {
+                        if (!startTime) {
+                            startTime = Date.now();
+                        }
+                        reps++;
+                        stage = 'down';
+                        document.getElementById('reps').textContent = 'Reps: ' + reps;
+                        const repSound = document.getElementById('rep-sound');
+                        repSound.currentTime = 0;
+                        repSound.play().catch(e => console.error('Audio play failed:', e));
+                        updateProgressBar();
                     }
                 }
             }
-            console.log('detect: end');
             if (window.poseDetectionActive) {
                 requestAnimationFrame(detect);
             }
@@ -853,33 +722,25 @@
         loader.style.display = 'none';
 
         window.poseDetectionActive = true;
-        console.log('main: starting detection');
         detect();
     }
 
 
-
+    let reps = 0;
+    let stage = null; // 'up' or 'down'
+    let startTime = null;
 
     function resetReps() {
         reps = 0;
-        stage = 'start';
+        stage = null;
         startTime = null;
         document.getElementById('reps').textContent = 'Reps: 0';
-        const timerDisplay = document.getElementById('timer');
-        const rpmDisplay = document.getElementById('rpm');
-        if(timerDisplay) timerDisplay.textContent = 'Time: 0s';
-        if(rpmDisplay) rpmDisplay.textContent = 'RPM: 0';
-        const progressBar = document.getElementById('progress-bar');
-        if (progressBar) {
-            progressBar.style.width = '0%';
+        document.getElementById('timer').textContent = 'Time: 0s';
+        document.getElementById('rpm').textContent = 'RPM: 0';
+        if (document.getElementById('progress-bar')) {
+            document.getElementById('progress-bar').style.width = '0%';
         }
     }
-
-    main().catch(err => {
-        console.error("Initialization failed:", err);
-        const loader = document.getElementById('loader');
-        loader.textContent = "Failed to initialize. Please check console for errors.";
-    });
 
     document.getElementById('save-button').addEventListener('click', () => {
         // This button now effectively resets the session
