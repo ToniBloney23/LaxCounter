@@ -625,10 +625,10 @@
             this.maxHistoryLength = 10;
             
             // Lacrosse ball specific parameters (regulation ball is 2.5 inches diameter)
-            this.minBallRadius = 5;  // Minimum radius for lacrosse ball detection (adjusted for 25ft distance)
-            this.maxBallRadius = 25;  // Maximum radius for lacrosse ball detection (adjusted for 25ft distance)
+            this.minBallRadius = 20;  // Minimum radius for lacrosse ball detection
+            this.maxBallRadius = 60;  // Maximum radius for lacrosse ball detection
             this.idealBallRadius = 30; // Ideal lacrosse ball radius in pixels
-            this.movementThreshold = 40; // Minimum movement to consider as significant (adjusted for 25ft distance)
+            this.movementThreshold = 15; // Minimum movement to consider as significant
             this.maxTrackingDistance = 180; // Maximum distance to track same ball (increased for more lenient tracking)
             
             // Detection quality thresholds (more conservative)
@@ -1125,24 +1125,46 @@
 
             if (ballTracker && ballTracker.initialized) {
                 const detectedBalls = ballTracker.detectBalls(video);
+                const detectedBall = detectedBalls.length > 0 ? detectedBalls[0] : null;
                 const currentTime = Date.now();
-                
-                if (showDetection && detectedBalls.length > 0) {
-                    drawBallDetection(detectedBalls, ctx);
+
+                if (showDetection && detectedBall) {
+                    drawBallDetection([detectedBall], ctx);
                 }
 
-                // Rep counting logic
-                console.log(`Detected Balls: ${detectedBalls.length}, Ball State: ${ballState}, Time since last throw: ${currentTime - lastThrowTime}, Time since last absent: ${currentTime - lastBallAbsentTime}`);
-                if (detectedBalls.length > 0) {
-                    // Ball is present
-                    if (ballState === 'waiting') {
-                        ballState = 'ball_present';
-                        if (!startTime) {
-                            startTime = Date.now();
+                // Rep counting state machine
+                switch (ballState) {
+                    case 'waiting':
+                        if (detectedBall) {
+                            ballState = 'ball_present';
+                            if (!startTime) {
+                                startTime = Date.now();
+                            }
                         }
-                    } else if (ballState === 'ball_away' && (currentTime - lastBallAbsentTime > minAbsentTime)) {
-                        // Ball returned after being away for long enough
-                        ballState = 'ball_returned';
+                        break;
+                    case 'ball_present':
+                        if (!detectedBall) {
+                            absentFrames++;
+                            if (absentFrames >= ballAbsentThreshold) {
+                                ballState = 'ball_away';
+                                lastBallAbsentTime = currentTime;
+                                absentFrames = 0;
+                            }
+                        } else {
+                            absentFrames = 0;
+                        }
+                        break;
+                    case 'ball_away':
+                        if (detectedBall) {
+                            if (currentTime - lastBallAbsentTime > minAbsentTime && currentTime - lastThrowTime > minTimeBetweenThrows) {
+                                ballState = 'ball_returned';
+                            } else {
+                                // Ball returned too quickly, likely a flicker, go back to present
+                                ballState = 'ball_present';
+                            }
+                        }
+                        break;
+                    case 'ball_returned':
                         reps++;
                         lastThrowTime = currentTime;
                         
@@ -1152,31 +1174,24 @@
                         repSound.play().catch(e => console.error('Audio play failed:', e));
                         updateProgressBar();
                         
-                        // Show visual feedback
+                        // Show visual feedback for a short duration
                         ctx.fillStyle = '#00FF00';
                         ctx.font = 'bold 48px Arial';
                         ctx.textAlign = 'center';
                         ctx.fillText('REP!', canvas.width / 2, canvas.height / 2);
                         ctx.textAlign = 'left';
-                    }
-                } else {
-                    // Ball is absent
-                    if (ballState === 'ball_present') {
-                        ballState = 'ball_away';
-                        lastBallAbsentTime = currentTime;
-                    } else if (ballState === 'ball_returned' && (currentTime - lastThrowTime > minTimeBetweenThrows)) {
-                        // Reset to waiting if ball is absent for a while after a rep
-                        ballState = 'waiting';
-                    }
+                        
+                        ballState = 'ball_present'; // Immediately go back to present
+                        break;
                 }
-                
+
                 // Display current state for debugging
                 if (showDetection) {
                     ctx.fillStyle = '#FFFFFF';
                     ctx.font = '16px Arial';
-                    ctx.fillText(`Ball State: ${ballState}`, 10, 30);
-                    ctx.fillText(`Balls Detected: ${detectedBalls.length}`, 10, 50);
-                    ctx.fillText(`Time since last throw: ${currentTime - lastThrowTime}ms`, 10, 70);
+                    ctx.fillText(`State: ${ballState}`, 10, 30);
+                    ctx.fillText(`Detected: ${detectedBall ? 'Yes' : 'No'}`, 10, 50);
+                    ctx.fillText(`Last Throw: ${Math.round((currentTime - lastThrowTime)/1000)}s ago`, 10, 70);
                 }
             } else {
                 // OpenCV not ready, show status
@@ -1211,13 +1226,14 @@
 
 
     let reps = 0;
-    let ballState = 'waiting';
+    let ballState = 'waiting'; // waiting, ball_present, ball_away, ball_returned
     let startTime = null;
     let lastThrowTime = 0; // Timestamp of the last counted throw
     let lastBallAbsentTime = 0; // Timestamp when the ball was last detected as absent
+    let absentFrames = 0; // Counter for consecutive frames where the ball is absent
 
     // Rep counting parameters (tuned for less sensitivity)
-    const minTimeBetweenThrows = 800; // Minimum time in ms between two throws to be counted as separate reps
+    const minTimeBetweenThrows = 1200; // Minimum time in ms between two throws to be counted as separate reps
     const minAbsentTime = 600; // Minimum time in ms the ball must be absent to consider it a new throw
     const ballAbsentThreshold = 5; // Number of consecutive frames ball must be absent to trigger state change
 
