@@ -49,6 +49,88 @@
       border-radius: 10px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
+    #goal-container {
+      width: 80%;
+      margin: 1rem auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      background: #2c2c2c;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    #goal-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      gap: 15px;
+    }
+    .goal-input-wrapper {
+      display: flex;
+      align-items: center;
+    }
+    #goal-input {
+      width: 80px;
+      text-align: center;
+      font-size: 1.2rem;
+      background: #333;
+      color: #f0f0f0;
+      border: 1px solid #555;
+      border-radius: 5px;
+    }
+    .goal-adjust-button {
+      width: 30px;
+      height: 30px;
+      font-size: 1.5rem;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .slider {
+      -webkit-appearance: none;
+      width: 50%;
+      height: 15px;
+      border-radius: 5px;
+      background: #d3d3d3;
+      outline: none;
+      opacity: 0.7;
+      -webkit-transition: .2s;
+      transition: opacity .2s;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #4CAF50;
+      cursor: pointer;
+    }
+    .slider::-moz-range-thumb {
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #4CAF50;
+      cursor: pointer;
+    }
+    #progress-bar-container {
+      width: 100%;
+      background-color: #555;
+      border-radius: 10px;
+      margin-top: 1rem;
+    }
+    #progress-bar {
+      width: 0%;
+      height: 20px;
+      background-color: #4CAF50;
+      border-radius: 10px;
+      transition: width 0.5s ease-in-out;
+    }
     .control-button, #reset-button, #view-toggle {
       font-size: 1.2rem;
       padding: 1rem 2rem;
@@ -284,6 +366,64 @@
         width: 80%;
         margin-bottom: 15px;
     }
+    .toggle-switch-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 80%;
+      margin-top: 15px;
+      color: white;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+    .switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider.round {
+      border-radius: 34px;
+    }
+    .slider.round:before {
+      border-radius: 50%;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+    input:checked + .slider {
+      background-color: #4CAF50;
+    }
+    input:focus + .slider {
+      box-shadow: 0 0 1px #4CAF50;
+    }
+    input:checked + .slider:before {
+      -webkit-transform: translateX(26px);
+      -ms-transform: translateX(26px);
+      transform: translateX(26px);
+    }
 
     #loader {
       position: fixed;
@@ -308,8 +448,22 @@
     <p>Use your camera to count your wall ball reps automatically.</p>
     <div id="reps-container">
       <div id="reps">Reps: 0</div>
-      <button id="reset-button" onclick="resetReps()">Reset</button>
+      <div id="timer" style="display: none;">Time: 0s</div>
+      <div id="rpm" style="display: none;">RPM: 0</div>
       <button id="save-button" class="control-button">Save</button>
+    </div>
+    <div id="goal-container">
+      <div id="goal-controls">
+        <label for="goal-input">Goal:</label>
+        <div class="goal-input-wrapper">
+          <button class="goal-adjust-button" id="goal-minus">-</button>
+          <input type="number" id="goal-input" min="10" max="500" value="100">
+          <button class="goal-adjust-button" id="goal-plus">+</button>
+        </div>
+      </div>
+      <div id="progress-bar-container">
+        <div id="progress-bar"></div>
+      </div>
     </div>
     <div id="menu-icon">
       <div></div>
@@ -323,6 +477,13 @@
           <button id="leaderboard-button" class="control-button">Leaderboard</button>
           <button id="session-history-button" class="control-button">History</button>
           <button id="view-toggle" class="control-button">Show Dots</button>
+          <div class="toggle-switch-container">
+            <label for="timer-rpm-toggle">Show Timer/RPM</label>
+            <label class="switch">
+              <input type="checkbox" id="timer-rpm-toggle">
+              <span class="slider round"></span>
+            </label>
+          </div>
         </div>
     </div>
     <canvas id="canvas"></canvas>
@@ -362,7 +523,7 @@
       <ul id="session-history-list"></ul>
     </div>
   </div>
-  <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg"></audio>
+  <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg" preload="auto"></audio>
 
   <script>
     async function setupCamera() {
@@ -404,7 +565,6 @@
 
         await video.play();
         cameraStatus.style.display = 'none';
-        resetReps(); // Use resetReps to initialize counter and stage
         return video;
       } catch (err) {
         localStorage.setItem('wallBallCameraAccess', 'denied');
@@ -462,14 +622,54 @@
             document.body.classList.add('focus-view');
         });
 
+        const goalInput = document.getElementById('goal-input');
+        const progressBar = document.getElementById('progress-bar');
+        let goal = parseInt(goalInput.value);
+        resetReps();
+
+        goalInput.addEventListener('input', () => {
+            goal = parseInt(goalInput.value);
+            updateProgressBar();
+        });
+
+        document.getElementById('goal-plus').addEventListener('click', () => {
+            goalInput.value = parseInt(goalInput.value) + 10;
+            goal = parseInt(goalInput.value);
+            updateProgressBar();
+        });
+
+        document.getElementById('goal-minus').addEventListener('click', () => {
+            goalInput.value = parseInt(goalInput.value) - 10;
+            goal = parseInt(goalInput.value);
+            updateProgressBar();
+        });
+
+        function updateProgressBar() {
+            const progress = (reps / goal) * 100;
+            progressBar.style.width = `${Math.min(progress, 100)}%`;
+        }
+
+        let startTime = null;
+        const timerDisplay = document.getElementById('timer');
+        const rpmDisplay = document.getElementById('rpm');
+
+        function updateTimerAndRPM() {
+            if (!startTime) return;
+            const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+            timerDisplay.textContent = `Time: ${elapsedSeconds}s`;
+
+            if (elapsedSeconds > 0) {
+                const rpm = Math.round((reps / elapsedSeconds) * 60);
+                rpmDisplay.textContent = `RPM: ${rpm}`;
+            }
+        }
+
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && document.body.classList.contains('focus-view')) {
                 document.body.classList.remove('focus-view');
                 document.getElementById('focus-mode-button').textContent = 'Focus Mode';
             }
         });
-
-
 
         document.getElementById('reps-container').addEventListener('click', () => {
             if (document.body.classList.contains('focus-view')) {
@@ -482,31 +682,33 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+            updateTimerAndRPM();
+
             if (poses.length > 0) {
                 const keypoints = poses[0].keypoints;
-                const trackedHand = 'right'; // Always track the right hand
+                const handToTrack = 'right';
 
-                const wrist = keypoints.find(k => k.name === `${trackedHand}_wrist`);
-                const shoulder = keypoints.find(k => k.name === `${trackedHand}_shoulder`);
+                const wrist = keypoints.find(k => k.name === `${handToTrack}_wrist`);
+                const shoulder = keypoints.find(k => k.name === `${handToTrack}_shoulder`);
 
                 if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
                     if (showDots) {
                         drawKeypoints(keypoints, ctx);
                     }
-                    const distance = Math.abs(wrist.y - shoulder.y);
 
-                    // A rep is counted when the hand goes from above the shoulder to below it.
                     if (wrist.y < shoulder.y - 15) { // Hand is above the shoulder
                         stage = 'up';
-                    }
-                    if (wrist.y > shoulder.y + 15 && stage === 'up') { // Hand is below the shoulder
-                        stage = 'down';
-                        reps++;
-                        document.getElementById('reps').textContent = `Reps: ${reps}`;
-                        if (reps % 10 === 0) {
-                            document.getElementById('rep-sound').play();
+                    } else if (wrist.y > shoulder.y && stage === 'up') {
+                        if (!startTime) {
+                            startTime = Date.now();
                         }
-                        stage = null; // Reset for next rep
+                        reps++;
+                        stage = 'down';
+                        document.getElementById('reps').textContent = 'Reps: ' + reps;
+                        const repSound = document.getElementById('rep-sound');
+                        repSound.currentTime = 0;
+                        repSound.play().catch(e => console.error('Audio play failed:', e));
+                        updateProgressBar();
                     }
                 }
             }
@@ -525,12 +727,24 @@
 
     let reps = 0;
     let stage = null; // 'up' or 'down'
+    let startTime = null;
 
     function resetReps() {
-      reps = 0;
-      stage = null;
-      document.getElementById('reps').textContent = 'Reps: 0';
+        reps = 0;
+        stage = null;
+        startTime = null;
+        document.getElementById('reps').textContent = 'Reps: 0';
+        document.getElementById('timer').textContent = 'Time: 0s';
+        document.getElementById('rpm').textContent = 'RPM: 0';
+        if (document.getElementById('progress-bar')) {
+            document.getElementById('progress-bar').style.width = '0%';
+        }
     }
+
+    document.getElementById('save-button').addEventListener('click', () => {
+        // This button now effectively resets the session
+        resetReps();
+    });
 
     document.getElementById('menu-icon').addEventListener('click', function() {
       this.classList.toggle('open');
@@ -542,7 +756,24 @@
       }
     });
 
+    const timerRpmToggle = document.getElementById('timer-rpm-toggle');
+    const timerEl = document.getElementById('timer');
+    const rpmEl = document.getElementById('rpm');
+
+    function setTimerRpmVisibility() {
+        if (timerRpmToggle.checked) {
+            timerEl.style.display = 'block';
+            rpmEl.style.display = 'block';
+        } else {
+            timerEl.style.display = 'none';
+            rpmEl.style.display = 'none';
+        }
+    }
+
+    timerRpmToggle.addEventListener('change', setTimerRpmVisibility);
+
     window.onload = () => {
+        setTimerRpmVisibility(); // Set initial state
         main().catch(console.error);
         setupUI();
     };
