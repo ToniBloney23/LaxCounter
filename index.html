@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-  <script src="https://unpkg.com/tracking@1.1.3/build/tracking-min.js"></script>
+
   <style>
     body {
       background: linear-gradient(to right, #232526, #414345);
@@ -75,6 +75,11 @@
     }
 
     #view-toggle {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
         background-image: linear-gradient(to right, #2196F3, #1976D2);
     }
 
@@ -90,7 +95,6 @@
     .focus-view #reset-button,
     .focus-view canvas,
     .focus-view #nav-drawer,
-    .focus-view #view-toggle,
     .focus-view #focus-mode-button {
         display: none;
     }
@@ -335,7 +339,6 @@
     <div id="controls-container">
       <button id="view-toggle">Show Dots</button>
       <button id="focus-mode-button" class="control-button">Focus Mode</button>
-      <button id="ball-detection-button" class="control-button">Detect Ball</button>
     </div>
     <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
       Requesting camera access...
@@ -476,14 +479,7 @@
             }
         });
 
-        const ballDetectionButton = document.getElementById('ball-detection-button');
-        ballDetectionButton.addEventListener('click', () => {
-            // Disable pose detection when ball detection is active
-            if (window.poseDetectionActive) {
-                window.poseDetectionActive = false;
-            }
-            detectBall();
-        });
+
 
         document.getElementById('reps-container').addEventListener('click', () => {
             if (document.body.classList.contains('focus-view')) {
@@ -535,36 +531,7 @@
         window.poseDetectionActive = true;
         detect();
     }
-    function detectBall() {
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const context = canvas.getContext('2d');
 
-        tracking.ColorTracker.registerColor('green', function(r, g, b) {
-            if (r < 100 && g > 100 && b < 100) {
-                return true;
-            }
-            return false;
-        });
-
-        const tracker = new tracking.ColorTracker(['green']);
-
-        tracking.track('#video', tracker, { camera: true });
-
-        tracker.on('track', function(event) {
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            event.data.forEach(function(rect) {
-                context.strokeStyle = '#00ff00';
-                context.strokeRect(rect.x, rect.y, rect.width, rect.height);
-                context.font = '11px Helvetica';
-                context.fillStyle = "#fff";
-                context.fillText('x: ' + rect.x + 'px', rect.x + rect.width + 5, rect.y + 11);
-                context.fillText('y: ' + rect.y + 'px', rect.x + rect.width + 5, rect.y + 22);
-            });
-        });
-    }
 
     let reps = 0;
     let stage = null; // 'up' or 'down'
