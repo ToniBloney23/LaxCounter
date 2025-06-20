@@ -486,6 +486,7 @@
     <canvas id="canvas"></canvas>
     <div id="controls-container">
       <button id="focus-mode-button" class="control-button">Focus Mode</button>
+      <button id="reset-button" class="control-button">Reset</button>
     </div>
     <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
       Requesting camera access...
@@ -1248,6 +1249,10 @@
 
     document.getElementById('save-button').addEventListener('click', () => {
         // This button now effectively resets the session
+        resetReps();
+    });
+
+    document.getElementById('reset-button').addEventListener('click', () => {
         resetReps();
     });
 
