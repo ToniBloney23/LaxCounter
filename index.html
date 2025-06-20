@@ -3,15 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wall Ball Rep Tracker</title>
+  <title>Lacrosse Ball Rep Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+  <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
 
   <style>
     body {
@@ -445,8 +441,8 @@
 <body>
   <div id="loader">Loading...</div>
   <div class="container">
-    <h1>Wall Ball Rep Tracker</h1>
-    <p>Use your camera to count your wall ball reps automatically.</p>
+    <h1>Lacrosse Ball Rep Tracker</h1>
+    <p>Use your camera to track lacrosse ball movement and count reps automatically.</p>
     <div id="reps-container">
       <div id="reps">Reps: 0</div>
       <div id="timer" style="display: none;">Time: 0s</div>
@@ -477,7 +473,7 @@
           <button id="login-button" class="control-button">Login/Sign Up</button>
           <button id="leaderboard-button" class="control-button">Leaderboard</button>
           <button id="session-history-button" class="control-button">History</button>
-          <button id="view-toggle" class="control-button">Show Dots</button>
+          <button id="view-toggle" class="control-button">Show Detection</button>
           <div class="toggle-switch-container">
             <label for="timer-rpm-toggle">Show Timer/RPM</label>
             <label class="switch">
@@ -584,21 +580,230 @@
       });
     }
 
-    function drawPoint(ctx, y, x, r, color) {
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
-        ctx.fill();
+    let openCvReady = false;
+    let ballTracker = null;
+    
+    function onOpenCvReady() {
+        openCvReady = true;
+        console.log('OpenCV.js is ready');
+        if (ballTracker) {
+            ballTracker.initialize();
+        }
     }
-
-    function drawKeypoints(keypoints, ctx) {
-        for (let i = 0; i < keypoints.length; i++) {
-            const keypoint = keypoints[i];
-            if (keypoint.score > 0.5) {
-                drawPoint(ctx, keypoint.y, keypoint.x, 5, 'red');
+    
+    function drawCircle(ctx, x, y, radius, color, thickness = 2) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = thickness;
+        ctx.stroke();
+    }
+    
+    function drawBallDetection(detectedBalls, ctx) {
+        detectedBalls.forEach((ball, index) => {
+            // Draw circle around detected ball
+            drawCircle(ctx, ball.x, ball.y, ball.radius, '#00FF00', 3);
+            
+            // Draw center point
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FF0000';
+            ctx.fill();
+            
+            // Draw confidence score
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '16px Arial';
+            ctx.fillText(`Ball ${index + 1}`, ball.x - 20, ball.y - ball.radius - 10);
+        });
+    }
+    
+    class LacrosseBallTracker {
+        constructor() {
+            this.previousBalls = [];
+            this.ballHistory = [];
+            this.maxHistoryLength = 10;
+            this.minBallRadius = 15;
+            this.maxBallRadius = 50;
+            this.movementThreshold = 30;
+            this.initialized = false;
+        }
+        
+        initialize() {
+            if (openCvReady) {
+                this.initialized = true;
+                console.log('Ball tracker initialized');
             }
         }
+        
+        detectBalls(videoElement) {
+            if (!this.initialized || !openCvReady) {
+                return [];
+            }
+            
+            try {
+                // Create OpenCV matrices
+                const src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+                const gray = new cv.Mat();
+                const blurred = new cv.Mat();
+                const circles = new cv.Mat();
+                
+                // Capture frame from video
+                const cap = new cv.VideoCapture(videoElement);
+                cap.read(src);
+                
+                // Convert to grayscale
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                
+                // Apply Gaussian blur to reduce noise
+                cv.GaussianBlur(gray, blurred, new cv.Size(9, 9), 2, 2);
+                
+                // Detect circles using HoughCircles
+                cv.HoughCircles(
+                    blurred,
+                    circles,
+                    cv.HOUGH_GRADIENT,
+                    1,              // dp: inverse ratio of accumulator resolution
+                    50,             // minDist: minimum distance between circle centers
+                    100,            // param1: upper threshold for edge detection
+                    30,             // param2: accumulator threshold for center detection
+                    this.minBallRadius,  // minRadius
+                    this.maxBallRadius   // maxRadius
+                );
+                
+                const detectedBalls = [];
+                
+                // Process detected circles
+                for (let i = 0; i < circles.cols; i++) {
+                    const x = circles.data32F[i * 3];
+                    const y = circles.data32F[i * 3 + 1];
+                    const radius = circles.data32F[i * 3 + 2];
+                    
+                    // Validate detection
+                    if (this.isValidBall(x, y, radius, videoElement.width, videoElement.height)) {
+                        detectedBalls.push({ x, y, radius, timestamp: Date.now() });
+                    }
+                }
+                
+                // Clean up OpenCV matrices
+                src.delete();
+                gray.delete();
+                blurred.delete();
+                circles.delete();
+                
+                return this.filterAndTrackBalls(detectedBalls);
+                
+            } catch (error) {
+                console.error('Ball detection error:', error);
+                return [];
+            }
+        }
+        
+        isValidBall(x, y, radius, frameWidth, frameHeight) {
+            // Check if ball is within frame bounds
+            if (x - radius < 0 || x + radius > frameWidth || 
+                y - radius < 0 || y + radius > frameHeight) {
+                return false;
+            }
+            
+            // Check radius constraints
+            if (radius < this.minBallRadius || radius > this.maxBallRadius) {
+                return false;
+            }
+            
+            return true;
+        }
+        
+        filterAndTrackBalls(detectedBalls) {
+            // If no previous balls, return current detections
+            if (this.previousBalls.length === 0) {
+                this.previousBalls = detectedBalls;
+                return detectedBalls;
+            }
+            
+            // Match current detections with previous balls
+            const matchedBalls = [];
+            
+            detectedBalls.forEach(currentBall => {
+                let bestMatch = null;
+                let minDistance = Infinity;
+                
+                this.previousBalls.forEach(prevBall => {
+                    const distance = Math.sqrt(
+                        Math.pow(currentBall.x - prevBall.x, 2) + 
+                        Math.pow(currentBall.y - prevBall.y, 2)
+                    );
+                    
+                    if (distance < minDistance && distance < this.movementThreshold) {
+                        minDistance = distance;
+                        bestMatch = prevBall;
+                    }
+                });
+                
+                if (bestMatch) {
+                    // Update ball with movement data
+                    currentBall.velocity = {
+                        x: currentBall.x - bestMatch.x,
+                        y: currentBall.y - bestMatch.y
+                    };
+                    currentBall.speed = Math.sqrt(
+                        Math.pow(currentBall.velocity.x, 2) + 
+                        Math.pow(currentBall.velocity.y, 2)
+                    );
+                    matchedBalls.push(currentBall);
+                }
+            });
+            
+            this.previousBalls = matchedBalls;
+            this.updateBallHistory(matchedBalls);
+            
+            return matchedBalls;
+        }
+        
+        updateBallHistory(balls) {
+            this.ballHistory.push({
+                timestamp: Date.now(),
+                balls: balls.map(ball => ({ ...ball }))
+            });
+            
+            // Keep only recent history
+            if (this.ballHistory.length > this.maxHistoryLength) {
+                this.ballHistory.shift();
+            }
+        }
+        
+        analyzeMovementPattern() {
+            if (this.ballHistory.length < 3) {
+                return { isThrow: false, direction: null };
+            }
+            
+            const recent = this.ballHistory.slice(-3);
+            const balls = recent.map(frame => frame.balls[0]).filter(Boolean);
+            
+            if (balls.length < 3) {
+                return { isThrow: false, direction: null };
+            }
+            
+            // Analyze vertical movement pattern
+            const verticalMovements = [];
+            for (let i = 1; i < balls.length; i++) {
+                verticalMovements.push(balls[i].y - balls[i-1].y);
+            }
+            
+            // Check for throw pattern: upward then downward movement
+            const hasUpwardMovement = verticalMovements.some(movement => movement < -10);
+            const hasDownwardMovement = verticalMovements.some(movement => movement > 10);
+            
+            return {
+                isThrow: hasUpwardMovement && hasDownwardMovement,
+                direction: verticalMovements[verticalMovements.length - 1] > 0 ? 'down' : 'up',
+                speed: balls[balls.length - 1].speed || 0
+            };
+        }
 
+        reset() {
+            this.ballHistory = [];
+            this.previousBalls = [];
+        }
     }
 
     async function main() {
@@ -608,14 +813,18 @@
         canvas.width = video.width;
         canvas.height = video.height;
 
-        const detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'mediapipe', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose' });
+        // Initialize ball tracker
+        ballTracker = new LacrosseBallTracker();
+        if (openCvReady) {
+            ballTracker.initialize();
+        }
 
-        let showDots = false;
+        let showDetection = false;
 
         const viewToggleButton = document.getElementById('view-toggle');
         viewToggleButton.addEventListener('click', () => {
-            showDots = !showDots;
-            viewToggleButton.textContent = showDots ? 'Hide Dots' : 'Show Dots';
+            showDetection = !showDetection;
+            viewToggleButton.textContent = showDetection ? 'Hide Detection' : 'Show Detection';
         });
 
         const focusModeButton = document.getElementById('focus-mode-button');
@@ -678,42 +887,103 @@
             }
         });
 
+        // Rep counting state machine
+        let repState = 'waiting'; // 'waiting', 'ball_detected', 'throw_started', 'throw_completed'
+        let lastThrowTime = 0;
+        const minTimeBetweenThrows = 500; // Minimum 500ms between throws
+
         async function detect() {
-            const poses = await detector.estimatePoses(video);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             updateTimerAndRPM();
 
-            if (poses.length > 0) {
-                const keypoints = poses[0].keypoints;
-                const handToTrack = 'right';
+            if (ballTracker && ballTracker.initialized) {
+                const detectedBalls = ballTracker.detectBalls(video);
+                
+                if (showDetection && detectedBalls.length > 0) {
+                    drawBallDetection(detectedBalls, ctx);
+                }
 
-                const wrist = keypoints.find(k => k.name === `${handToTrack}_wrist`);
-                const shoulder = keypoints.find(k => k.name === `${handToTrack}_shoulder`);
-
-                if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
-                    if (showDots) {
-                        drawKeypoints(keypoints, ctx);
+                // Analyze ball movement for rep counting
+                if (detectedBalls.length > 0) {
+                    const movement = ballTracker.analyzeMovementPattern();
+                    const currentTime = Date.now();
+                    
+                    // State machine for accurate rep counting
+                    switch (repState) {
+                        case 'waiting':
+                            if (detectedBalls.length > 0) {
+                                repState = 'ball_detected';
+                            }
+                            break;
+                            
+                        case 'ball_detected':
+                            if (movement.isThrow && movement.direction === 'up') {
+                                repState = 'throw_started';
+                            }
+                            break;
+                            
+                        case 'throw_started':
+                            if (movement.isThrow && movement.direction === 'down' && 
+                                currentTime - lastThrowTime > minTimeBetweenThrows) {
+                                
+                                // Count the rep
+                                if (!startTime) {
+                                    startTime = Date.now();
+                                }
+                                reps++;
+                                lastThrowTime = currentTime;
+                                repState = 'throw_completed';
+                                
+                                document.getElementById('reps').textContent = 'Reps: ' + reps;
+                                const repSound = document.getElementById('rep-sound');
+                                repSound.currentTime = 0;
+                                repSound.play().catch(e => console.error('Audio play failed:', e));
+                                updateProgressBar();
+                                
+                                // Show visual feedback
+                                ctx.fillStyle = '#00FF00';
+                                ctx.font = 'bold 48px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.fillText('REP!', canvas.width / 2, canvas.height / 2);
+                                ctx.textAlign = 'left';
+                            }
+                            break;
+                            
+                        case 'throw_completed':
+                            // Wait for ball to settle before detecting next throw
+                            if (movement.speed < 5) {
+                                repState = 'waiting';
+                            }
+                            break;
                     }
-
-                    if (wrist.y < shoulder.y - 15) { // Hand is above the shoulder
-                        stage = 'up';
-                    } else if (wrist.y > shoulder.y && stage === 'up') {
-                        if (!startTime) {
-                            startTime = Date.now();
-                        }
-                        reps++;
-                        stage = 'down';
-                        document.getElementById('reps').textContent = 'Reps: ' + reps;
-                        const repSound = document.getElementById('rep-sound');
-                        repSound.currentTime = 0;
-                        repSound.play().catch(e => console.error('Audio play failed:', e));
-                        updateProgressBar();
+                    
+                    // Display current state for debugging
+                    if (showDetection) {
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.font = '16px Arial';
+                        ctx.fillText(`State: ${repState}`, 10, 30);
+                        ctx.fillText(`Movement: ${movement.direction || 'none'}`, 10, 50);
+                        ctx.fillText(`Speed: ${Math.round(movement.speed || 0)}`, 10, 70);
+                        ctx.fillText(`Balls: ${detectedBalls.length}`, 10, 90);
+                    }
+                } else {
+                    // No balls detected, reset to waiting state
+                    if (repState !== 'waiting') {
+                        repState = 'waiting';
                     }
                 }
+            } else {
+                // OpenCV not ready, show status
+                ctx.fillStyle = '#FFFF00';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Loading ball detection...', canvas.width / 2, canvas.height / 2);
+                ctx.textAlign = 'left';
             }
-            if (window.poseDetectionActive) {
+            
+            if (window.ballDetectionActive) {
                 requestAnimationFrame(detect);
             }
         }
@@ -721,24 +991,27 @@
         const loader = document.getElementById('loader');
         loader.style.display = 'none';
 
-        window.poseDetectionActive = true;
+        window.ballDetectionActive = true;
         detect();
     }
 
 
     let reps = 0;
-    let stage = null; // 'up' or 'down'
+    let ballState = 'waiting';
     let startTime = null;
 
     function resetReps() {
         reps = 0;
-        stage = null;
+        ballState = 'waiting';
         startTime = null;
         document.getElementById('reps').textContent = 'Reps: 0';
         document.getElementById('timer').textContent = 'Time: 0s';
         document.getElementById('rpm').textContent = 'RPM: 0';
         if (document.getElementById('progress-bar')) {
             document.getElementById('progress-bar').style.width = '0%';
+        }
+        if (ballTracker) {
+            ballTracker.reset();
         }
     }
 
@@ -780,7 +1053,7 @@
     };
 
     window.onbeforeunload = () => {
-        // This can be left empty or removed if you only want manual saving
+        window.ballDetectionActive = false;
     };
 
     function setupUI() {
