@@ -292,9 +292,24 @@
         margin-bottom: 15px;
     }
 
+    #loader {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 9999;
+      background: #232526;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2rem;
+      color: #4CAF50;
+    }
   </style>
 </head>
 <body>
+  <div id="loader">Loading...</div>
   <div class="container">
     <h1>Wall Ball Rep Tracker</h1>
     <p>Use your camera to count your wall ball reps automatically.</p>
@@ -474,6 +489,9 @@
                 document.body.classList.remove('focus-view');
             }
         });
+
+        const loader = document.getElementById('loader');
+        loader.style.display = 'none';
 
         async function detect() {
             const poses = await detector.estimatePoses(video);
