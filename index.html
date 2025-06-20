@@ -545,7 +545,17 @@
       cameraStatus.style.display = 'block';
       cameraStatus.innerHTML = 'Checking camera permissions...';
 
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const errorMessage = 'Camera API not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.';
+        cameraStatus.innerHTML = errorMessage + ' <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
+        repsDisplay.textContent = 'Browser Not Supported';
+        console.error('getUserMedia not supported');
+        throw new Error('getUserMedia not supported');
+      }
+
       try {
+        console.log('Requesting camera access...');
         // Add a timeout for the getUserMedia request
         const stream = await Promise.race([
             navigator.mediaDevices.getUserMedia({
@@ -556,43 +566,78 @@
                     frameRate: { ideal: 60 }
                 }
             }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out')), 10000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out after 10 seconds')), 10000))
         ]);
 
+        console.log('Camera stream obtained, setting up video...');
         video.srcObject = stream;
         localStorage.setItem('wallBallCameraAccess', 'granted');
         cameraStatus.innerHTML = 'Camera access granted. Loading video...';
         
         await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Video load timeout')), 10000);
+          const timeout = setTimeout(() => reject(new Error('Video metadata load timeout after 10 seconds')), 10000);
           video.onloadedmetadata = () => {
+            console.log('Video metadata loaded:', video.videoWidth, 'x', video.videoHeight);
             clearTimeout(timeout);
             video.width = video.videoWidth;
             video.height = video.videoHeight;
             resolve();
           };
+          video.onerror = (e) => {
+            clearTimeout(timeout);
+            reject(new Error('Video element error: ' + e.message));
+          };
         });
 
+        console.log('Starting video playback...');
         await video.play();
         cameraStatus.style.display = 'none';
         console.log('setupCamera: success');
         return video;
       } catch (err) {
         localStorage.setItem('wallBallCameraAccess', 'denied');
-        let errorMessage = `Camera access failed: ${err.message}.`;
+        console.error('Detailed camera error:', {
+          name: err.name,
+          message: err.message,
+          stack: err.stack
+        });
+        
+        let errorMessage = `Camera Error: ${err.message}`;
+        let suggestions = '';
+        
         if (err.name === 'NotAllowedError') {
-            errorMessage += '<br>Please grant camera permissions in your browser settings and refresh the page.';
+            suggestions = '<br><strong>Solution:</strong> Grant camera permissions in your browser and refresh the page.';
         } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-            errorMessage += '<br>No camera found. Please ensure a camera is connected and enabled.';
+            suggestions = '<br><strong>Solution:</strong> Connect a camera and ensure it\'s enabled in device settings.';
+        } else if (err.name === 'NotReadableError' || err.message.includes('in use')) {
+            suggestions = '<br><strong>Solution:</strong> Close other applications using the camera (Zoom, Skype, etc.).';
+        } else if (err.message.includes('timeout')) {
+            suggestions = '<br><strong>Solution:</strong> Check your camera connection and try again.';
+        } else if (err.name === 'OverconstrainedError') {
+            suggestions = '<br><strong>Solution:</strong> Your camera doesn\'t support the requested resolution. Trying with lower settings...';
+            // Try with lower constraints
+            try {
+              console.log('Retrying with lower camera constraints...');
+              const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480 }
+              });
+              video.srcObject = fallbackStream;
+              await video.play();
+              cameraStatus.style.display = 'none';
+              console.log('setupCamera: success with fallback');
+              return video;
+            } catch (fallbackErr) {
+              console.error('Fallback also failed:', fallbackErr);
+              suggestions = '<br><strong>Solution:</strong> Camera constraints not supported. Please try a different camera.';
+            }
         } else {
-            errorMessage += '<br>Please ensure your camera is not being used by another application.';
+            suggestions = '<br><strong>Suggestions:</strong> Refresh the page, check camera permissions, or try a different browser.';
         }
-        errorMessage += ' <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
+        
+        errorMessage += suggestions + ' <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
         
         cameraStatus.innerHTML = errorMessage;
         repsDisplay.textContent = 'Camera Error';
-        console.error('Camera error:', err);
-        console.log('setupCamera: error');
         throw err;
       }
     }
@@ -633,7 +678,29 @@
         canvas.width = video.width;
         canvas.height = video.height;
 
-        const detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'mediapipe', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose' });
+        let detector;
+        try {
+            console.log('Initializing pose detector...');
+            // Try BlazePose with TensorFlow.js backend first (more reliable)
+            detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
+                runtime: 'tfjs',
+                modelType: 'lite'
+            });
+            console.log('Pose detector initialized successfully with TensorFlow.js backend');
+        } catch (tfError) {
+            console.warn('TensorFlow.js backend failed, trying MediaPipe:', tfError);
+            try {
+                // Fallback to MediaPipe with alternative CDN
+                detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
+                    runtime: 'mediapipe',
+                    solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404'
+                });
+                console.log('Pose detector initialized with MediaPipe backend');
+            } catch (mpError) {
+                console.error('Both pose detection backends failed:', { tfError, mpError });
+                throw new Error('Pose detection initialization failed. Please refresh the page.');
+            }
+        }
 
         let showDots = false;
 
