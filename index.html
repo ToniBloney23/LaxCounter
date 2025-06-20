@@ -1031,17 +1031,18 @@
     }
 
     async function main() {
-        const video = await setupCamera();
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = video.width;
-        canvas.height = video.height;
+        try {
+            const video = await setupCamera();
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.width;
+            canvas.height = video.height;
 
-        // Initialize ball tracker
-        ballTracker = new LacrosseBallTracker();
-        if (openCvReady) {
-            ballTracker.initialize();
-        }
+            // Initialize ball tracker
+            ballTracker = new LacrosseBallTracker();
+            if (openCvReady) {
+                ballTracker.initialize();
+            }
 
         let showDetection = false;
 
@@ -1220,11 +1221,21 @@
             }
         }
 
-        const loader = document.getElementById('loader');
-        loader.style.display = 'none';
+            const loader = document.getElementById('loader');
+            loader.style.display = 'none';
 
-        window.ballDetectionActive = true;
-        detect();
+            window.ballDetectionActive = true;
+            detect();
+        } catch (error) {
+            console.error('Camera setup failed:', error);
+            // Hide loader even if camera setup fails
+            const loader = document.getElementById('loader');
+            loader.style.display = 'none';
+            
+            // Show error message to user
+            const repsDisplay = document.getElementById('reps');
+            repsDisplay.textContent = 'Camera setup failed';
+        }
     }
 
 
