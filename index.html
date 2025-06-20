@@ -626,6 +626,7 @@
         const goalInput = document.getElementById('goal-input');
         const progressBar = document.getElementById('progress-bar');
         let goal = parseInt(goalInput.value);
+        let stage = 'start'; // Initial state
         resetReps();
 
         goalInput.addEventListener('input', () => {
@@ -648,6 +649,16 @@
         function updateProgressBar() {
             const progress = (reps / goal) * 100;
             progressBar.style.width = `${Math.min(progress, 100)}%`;
+        }
+
+        function resetReps() {
+            reps = 0;
+            stage = 'start';
+            startTime = null;
+            document.getElementById('reps').textContent = 'Reps: 0';
+            timerDisplay.textContent = 'Time: 0s';
+            rpmDisplay.textContent = 'RPM: 0';
+            updateProgressBar();
         }
 
         let startTime = null;
@@ -692,24 +703,48 @@
                 const wrist = keypoints.find(k => k.name === `${handToTrack}_wrist`);
                 const shoulder = keypoints.find(k => k.name === `${handToTrack}_shoulder`);
 
-                if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
+                const leftHip = keypoints.find(k => k.name === 'left_hip');
+                const rightHip = keypoints.find(k => k.name === 'right_hip');
+                const leftKnee = keypoints.find(k => k.name === 'left_knee');
+                const rightKnee = keypoints.find(k => k.name === 'right_knee');
+
+                if (wrist && shoulder && leftHip && rightHip && leftKnee && rightKnee &&
+                    wrist.score > 0.5 && shoulder.score > 0.5 && leftHip.score > 0.5 &&
+                    rightHip.score > 0.5 && leftKnee.score > 0.5 && rightKnee.score > 0.5) {
+
                     if (showDots) {
                         drawKeypoints(keypoints, ctx);
                     }
 
-                    if (wrist.y < shoulder.y - 15) { // Hand is above the shoulder
-                        stage = 'up';
-                    } else if (wrist.y > shoulder.y && stage === 'up') {
-                        if (!startTime) {
-                            startTime = Date.now();
-                        }
-                        reps++;
-                        stage = 'down';
-                        document.getElementById('reps').textContent = 'Reps: ' + reps;
-                        const repSound = document.getElementById('rep-sound');
-                        repSound.currentTime = 0;
-                        repSound.play().catch(e => console.error('Audio play failed:', e));
-                        updateProgressBar();
+                    const hipY = (leftHip.y + rightHip.y) / 2;
+                    const kneeY = (leftKnee.y + rightKnee.y) / 2;
+
+                    // State machine for rep counting
+                    switch (stage) {
+                        case 'start':
+                            if (hipY > kneeY) { // Squat down
+                                stage = 'squat_down';
+                            }
+                            break;
+                        case 'squat_down':
+                            if (hipY < kneeY) { // Stand up
+                                stage = 'squat_up';
+                            }
+                            break;
+                        case 'squat_up':
+                            if (wrist.y < shoulder.y - 15) { // Throw
+                                if (!startTime) {
+                                    startTime = Date.now();
+                                }
+                                reps++;
+                                document.getElementById('reps').textContent = 'Reps: ' + reps;
+                                const repSound = document.getElementById('rep-sound');
+                                repSound.currentTime = 0;
+                                repSound.play().catch(e => console.error('Error playing sound:', e));
+                                updateProgressBar();
+                                stage = 'start'; // Reset for next rep
+                            }
+                            break;
                     }
                 }
             }
