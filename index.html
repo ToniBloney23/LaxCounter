@@ -620,7 +620,7 @@
     class LacrosseBallTracker {
         constructor() {
             this.previousBalls = [];
-            this.ballHistory = [];
+            this.ballHistory = {};
             this.maxHistoryLength = 10;
             this.minBallRadius = 15;
             this.maxBallRadius = 50;
@@ -663,16 +663,17 @@
                     circles,
                     cv.HOUGH_GRADIENT,
                     1,              // dp: inverse ratio of accumulator resolution
-                    50,             // minDist: minimum distance between circle centers
+                    80,             // minDist: minimum distance between circle centers (increased)
                     100,            // param1: upper threshold for edge detection
-                    30,             // param2: accumulator threshold for center detection
+                    35,             // param2: accumulator threshold for center detection (increased for better quality)
                     this.minBallRadius,  // minRadius
                     this.maxBallRadius   // maxRadius
                 );
                 
-                const detectedBalls = [];
+                let bestBall = null;
+                let bestScore = 0;
                 
-                // Process detected circles
+                // Process detected circles and find the best one
                 for (let i = 0; i < circles.cols; i++) {
                     const x = circles.data32F[i * 3];
                     const y = circles.data32F[i * 3 + 1];
@@ -680,7 +681,26 @@
                     
                     // Validate detection
                     if (this.isValidBall(x, y, radius, videoElement.width, videoElement.height)) {
-                        detectedBalls.push({ x, y, radius, timestamp: Date.now() });
+                        // Calculate quality score based on radius (prefer balls closer to expected size)
+                        const idealRadius = (this.minBallRadius + this.maxBallRadius) / 2;
+                        const radiusScore = 1 - Math.abs(radius - idealRadius) / idealRadius;
+                        
+                        // Prefer balls in center of frame
+                        const centerX = videoElement.width / 2;
+                        const centerY = videoElement.height / 2;
+                        const distanceFromCenter = Math.sqrt(
+                            Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
+                        );
+                        const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
+                        const centerScore = 1 - (distanceFromCenter / maxDistance);
+                        
+                        // Combined score
+                        const totalScore = radiusScore * 0.7 + centerScore * 0.3;
+                        
+                        if (totalScore > bestScore) {
+                            bestScore = totalScore;
+                            bestBall = { x, y, radius, timestamp: Date.now(), score: totalScore };
+                        }
                     }
                 }
                 
@@ -690,7 +710,8 @@
                 blurred.delete();
                 circles.delete();
                 
-                return this.filterAndTrackBalls(detectedBalls);
+                // Return single best ball or empty array
+                return bestBall ? [bestBall] : [];
                 
             } catch (error) {
                 console.error('Ball detection error:', error);
@@ -714,94 +735,145 @@
         }
         
         filterAndTrackBalls(detectedBalls) {
-            // If no previous balls, return current detections
-            if (this.previousBalls.length === 0) {
-                this.previousBalls = detectedBalls;
-                return detectedBalls;
+            const currentTime = Date.now();
+            
+            // Since we only track one ball, simplify the logic
+            if (detectedBalls.length === 0) {
+                this.previousBalls = [];
+                return [];
             }
             
-            // Match current detections with previous balls
-            const matchedBalls = [];
+            const ball = detectedBalls[0]; // Only one ball
+            let trackedBall;
             
-            detectedBalls.forEach(currentBall => {
-                let bestMatch = null;
-                let minDistance = Infinity;
+            // Check if we have a previous ball to track from
+            if (this.previousBalls.length > 0) {
+                const prevBall = this.previousBalls[0];
+                const distance = Math.sqrt(
+                    Math.pow(ball.x - prevBall.x, 2) + 
+                    Math.pow(ball.y - prevBall.y, 2)
+                );
                 
-                this.previousBalls.forEach(prevBall => {
-                    const distance = Math.sqrt(
-                        Math.pow(currentBall.x - prevBall.x, 2) + 
-                        Math.pow(currentBall.y - prevBall.y, 2)
-                    );
-                    
-                    if (distance < minDistance && distance < this.movementThreshold) {
-                        minDistance = distance;
-                        bestMatch = prevBall;
-                    }
-                });
-                
-                if (bestMatch) {
-                    // Update ball with movement data
-                    currentBall.velocity = {
-                        x: currentBall.x - bestMatch.x,
-                        y: currentBall.y - bestMatch.y
+                // If the ball moved too far, treat as new detection
+                 if (distance > this.maxTrackingDistance) {
+                    trackedBall = {
+                        ...ball,
+                        id: Math.random().toString(36).substr(2, 9),
+                        velocity: { x: 0, y: 0, magnitude: 0 }
                     };
-                    currentBall.speed = Math.sqrt(
-                        Math.pow(currentBall.velocity.x, 2) + 
-                        Math.pow(currentBall.velocity.y, 2)
-                    );
-                    matchedBalls.push(currentBall);
+                } else {
+                    // Continue tracking the same ball
+                    trackedBall = {
+                        ...ball,
+                        id: prevBall.id,
+                        velocity: {
+                            x: ball.x - prevBall.x,
+                            y: ball.y - prevBall.y,
+                            magnitude: Math.sqrt(
+                                Math.pow(ball.x - prevBall.x, 2) + 
+                                Math.pow(ball.y - prevBall.y, 2)
+                            )
+                        }
+                    };
                 }
-            });
+            } else {
+                // First detection
+                trackedBall = {
+                    ...ball,
+                    id: Math.random().toString(36).substr(2, 9),
+                    velocity: { x: 0, y: 0, magnitude: 0 }
+                };
+            }
             
-            this.previousBalls = matchedBalls;
-            this.updateBallHistory(matchedBalls);
+            // Update previous balls for next frame
+            this.previousBalls = [trackedBall];
             
-            return matchedBalls;
+            // Update ball history for movement analysis
+            this.updateBallHistory([trackedBall]);
+            
+            return [trackedBall];
         }
         
         updateBallHistory(balls) {
-            this.ballHistory.push({
-                timestamp: Date.now(),
-                balls: balls.map(ball => ({ ...ball }))
+            const currentTime = Date.now();
+            
+            // Since we only track one ball, simplify history management
+            if (balls.length === 0) {
+                // Clear history if no ball detected
+                this.ballHistory = {};
+                return;
+            }
+            
+            const ball = balls[0]; // Only one ball
+            
+            if (!this.ballHistory[ball.id]) {
+                this.ballHistory[ball.id] = [];
+            }
+            
+            this.ballHistory[ball.id].push({
+                x: ball.x,
+                y: ball.y,
+                timestamp: currentTime,
+                velocity: ball.velocity || { x: 0, y: 0, magnitude: 0 }
             });
             
-            // Keep only recent history
-            if (this.ballHistory.length > this.maxHistoryLength) {
-                this.ballHistory.shift();
-            }
+            // Keep only recent history (last 2 seconds)
+            const cutoffTime = currentTime - 2000;
+            this.ballHistory[ball.id] = this.ballHistory[ball.id].filter(
+                point => point.timestamp > cutoffTime
+            );
+            
+            // Clean up old ball histories (keep only current ball)
+            Object.keys(this.ballHistory).forEach(ballId => {
+                if (ballId !== ball.id) {
+                    delete this.ballHistory[ballId];
+                }
+            });
         }
         
         analyzeMovementPattern() {
-            if (this.ballHistory.length < 3) {
+            // Get the current ball's history
+            const ballIds = Object.keys(this.ballHistory);
+            if (ballIds.length === 0) {
                 return { isThrow: false, direction: null };
             }
             
-            const recent = this.ballHistory.slice(-3);
-            const balls = recent.map(frame => frame.balls[0]).filter(Boolean);
+            const ballId = ballIds[0]; // Only one ball
+            const history = this.ballHistory[ballId];
             
-            if (balls.length < 3) {
+            if (history.length < 3) {
                 return { isThrow: false, direction: null };
             }
             
-            // Analyze vertical movement pattern
-            const verticalMovements = [];
-            for (let i = 1; i < balls.length; i++) {
-                verticalMovements.push(balls[i].y - balls[i-1].y);
+            const recent = history.slice(-5); // Last 5 points
+            let totalMovement = 0;
+            let verticalMovement = 0;
+            
+            for (let i = 1; i < recent.length; i++) {
+                const prev = recent[i-1];
+                const curr = recent[i];
+                
+                const dx = curr.x - prev.x;
+                const dy = curr.y - prev.y;
+                const movement = Math.sqrt(dx*dx + dy*dy);
+                
+                totalMovement += movement;
+                verticalMovement += Math.abs(dy);
             }
             
-            // Check for throw pattern: upward then downward movement
-            const hasUpwardMovement = verticalMovements.some(movement => movement < -10);
-            const hasDownwardMovement = verticalMovements.some(movement => movement > 10);
+            const avgMovement = totalMovement / (recent.length - 1);
+            const isSignificantMovement = avgMovement > this.movementThreshold;
+            const isVerticalMovement = verticalMovement > totalMovement * 0.6;
             
             return {
-                isThrow: hasUpwardMovement && hasDownwardMovement,
-                direction: verticalMovements[verticalMovements.length - 1] > 0 ? 'down' : 'up',
-                speed: balls[balls.length - 1].speed || 0
+                isThrow: isSignificantMovement && isVerticalMovement,
+                direction: verticalMovement > 0 ? 'down' : 'up',
+                movement: avgMovement
             };
         }
 
         reset() {
-            this.ballHistory = [];
+            this.ballHistory = {};
             this.previousBalls = [];
         }
     }
