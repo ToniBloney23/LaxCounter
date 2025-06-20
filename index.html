@@ -7,7 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-  <script src="https://docs.opencv.org/4.9.0/opencv.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
 
   <style>
     body {
@@ -45,6 +49,169 @@
       border-radius: 10px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
+    #goal-container {
+      width: 80%;
+      margin: 1rem auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      background: #2c2c2c;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    #goal-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      gap: 15px;
+    }
+    .goal-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #goal-input {
+      width: 80px;
+      text-align: center;
+      font-size: 1.2rem;
+      background: #333;
+      color: #f0f0f0;
+      border: 1px solid #555;
+      border-radius: 5px;
+    }
+    .goal-adjust-button {
+      width: 30px;
+      height: 30px;
+      font-size: 1.5rem;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .slider {
+      -webkit-appearance: none;
+      width: 50%;
+      height: 15px;
+      border-radius: 5px;
+      background: #d3d3d3;
+      outline: none;
+      opacity: 0.7;
+      -webkit-transition: .2s;
+      transition: opacity .2s;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #4CAF50;
+      cursor: pointer;
+    }
+    .slider::-moz-range-thumb {
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #4CAF50;
+      cursor: pointer;
+    }
+    #progress-bar-container {
+      width: 100%;
+      background-color: #555;
+      border-radius: 10px;
+      margin-top: 1rem;
+    }
+    #progress-bar {
+      width: 0%;
+      height: 20px;
+      background-color: #4CAF50;
+      border-radius: 10px;
+      transition: width 0.5s ease-in-out;
+    }
+    .control-button, #reset-button, #view-toggle {
+      font-size: 1.2rem;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 25px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    #reset-button {
+      background-image: linear-gradient(to right, #f44336, #d32f2f);
+    }
+
+    #reset-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    #controls-container {
+      margin-top: 1.5rem;
+    }
+
+
+
+    .focus-view h1,
+    .focus-view p,
+    .focus-view #menu-icon,
+    .focus-view #save-button,
+    .focus-view #reset-button,
+    .focus-view canvas,
+    .focus-view #nav-drawer,
+    .focus-view #focus-mode-button {
+        display: none;
+    }
+
+    .focus-view #reps-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: #000;
+        z-index: 2000;
+    }
+
+    .focus-view #reps {
+        font-size: 25vw;
+        color: #4CAF50;
+    }
+
+    .focus-view #focus-mode-button {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 2001;
+    }
+    .retry-button {
+      font-size: 1rem;
+      padding: 0.4rem 0.8rem;
+      background: #2196F3;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+      margin-left: 0.5rem;
+      transition: background 0.3s;
+    }
+    .retry-button:hover {
+      background: #1976D2;
+    }
+    video {
+      display: none;
+    }
     canvas {
       max-width: 100%;
       width: 100%;
@@ -54,6 +221,211 @@
       display: block;
       margin: 1rem auto;
     }
+    .control-button {
+        background-image: linear-gradient(to right, #2196F3, #1976D2);
+    }
+    .control-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+    .modal {
+        position: fixed; 
+        z-index: 1; 
+        left: 0;
+        top: 0;
+        width: 100%; 
+        height: 100%; 
+        overflow: auto; 
+        background-color: rgba(0,0,0,0.6);
+    }
+    .modal-content {
+        background: #333;
+        margin: 15% auto; 
+        padding: 25px;
+        border: none;
+        width: 90%;
+        max-width: 400px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .close-button {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+    .close-button:hover,
+    .close-button:focus {
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    #login-modal input {
+      width: calc(100% - 20px);
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #555;
+      background: #444;
+      color: #f0f0f0;
+    }
+
+    #leaderboard-list li, #session-history-list li {
+      background: #444;
+      margin-bottom: 8px;
+      padding: 12px;
+      border-radius: 8px;
+      list-style-position: inside;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    #leaderboard-list li:hover, #session-history-list li:hover {
+      background-color: #555;
+      transform: scale(1.02);
+    }
+
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 2rem;
+      }
+      p {
+        font-size: 1rem;
+      }
+      #reps-container {
+        font-size: 2rem;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+      }
+      .container {
+        padding: 1rem;
+      }
+      #user-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .control-button {
+        width: 100%;
+        text-align: center;
+      }
+      #nav-drawer {
+        width: 100%;
+        right: -100%;
+      }
+      #menu-icon.open + #nav-drawer {
+        right: 0;
+      }
+    }
+
+    #menu-icon {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      cursor: pointer;
+      z-index: 1001;
+    }
+
+    #menu-icon div {
+      width: 35px;
+      height: 5px;
+      background-color: white;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    #nav-drawer {
+      position: fixed;
+      top: 0;
+      right: -300px; /* Start off-screen */
+      width: 250px;
+      height: 100%;
+      background-color: #333;
+      padding-top: 60px;
+      transition: 0.5s;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #nav-drawer .control-button {
+        width: 80%;
+        margin-bottom: 15px;
+    }
+    .toggle-switch-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 80%;
+      margin-top: 15px;
+      color: white;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+    .switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider.round {
+      border-radius: 34px;
+    }
+    .slider.round:before {
+      border-radius: 50%;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+    input:checked + .slider {
+      background-color: #4CAF50;
+    }
+    input:focus + .slider {
+      box-shadow: 0 0 1px #4CAF50;
+    }
+    input:checked + .slider:before {
+      -webkit-transform: translateX(26px);
+      -ms-transform: translateX(26px);
+      transform: translateX(26px);
+    }
+
     #loader {
       position: fixed;
       left: 0;
@@ -68,471 +440,235 @@
       font-size: 2rem;
       color: #4CAF50;
     }
-    .control-button {
-      font-size: 1.2rem;
-      padding: 1rem 2rem;
-      border: none;
-      border-radius: 25px;
-      color: white;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-      background-image: linear-gradient(to right, #2196F3, #1976D2);
-    }
-    .control-button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    }
-    .focus-view h1,
-    .focus-view p,
-    .focus-view .control-button,
-    .focus-view canvas {
-        display: none;
-    }
-    .focus-view #reps-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        background: #000;
-        z-index: 2000;
-    }
-    .focus-view #reps {
-        font-size: 25vw;
-        color: #4CAF50;
-    }
-    #reset-button {
-        background-image: linear-gradient(to right, #D32F2F, #C62828);
-        margin-top: 1rem;
-    }
-    #hamburger-menu {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 3000;
-    }
-    #menu-icon {
-        font-size: 1.5rem;
-        cursor: pointer;
-        background: #2c2c2c;
-        padding: 0.5rem 0.8rem;
-        border-radius: 50%;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        transition: all 0.2s ease-in-out;
-    }
-    #menu-icon:hover {
-        transform: scale(1.1);
-    }
-    #menu-items {
-        display: none;
-        position: absolute;
-        right: 0;
-        top: 70px;
-        background-color: #333;
-        padding: 1rem 0;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.6);
-        width: 280px;
-        opacity: 0;
-        transform: translateY(-10px);
-        transition: opacity 0.3s ease, transform 0.3s ease;
-    }
-    #hamburger-menu.menu-open #menu-items {
-        display: block;
-        opacity: 1;
-        transform: translateY(0);
-    }
-    .menu-item {
-        padding: 1rem 1.8rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-        font-size: 1.1rem;
-    }
-    .menu-item:hover {
-        background-color: #414345;
-    }
-    .menu-item label {
-        cursor: pointer;
-    }
-    /* Custom Toggle Switch */
-    .menu-item input[type="checkbox"] {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-    .toggle-switch {
-        height: 24px;
-        width: 44px;
-        background-color: #555;
-        border-radius: 12px;
-        position: relative;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-    }
-    .toggle-switch::before {
-        content: '';
-        position: absolute;
-        height: 18px;
-        width: 18px;
-        left: 3px;
-        bottom: 3px;
-        background-color: white;
-        border-radius: 50%;
-        transition: transform 0.2s ease;
-    }
-    input:checked + .toggle-switch {
-        background-color: #4CAF50;
-    }
-    input:checked + .toggle-switch::before {
-        transform: translateX(20px);
-    }
-    #account-modal {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: #333;
-        padding: 2rem;
-        border-radius: 10px;
-        z-index: 4000;
-        width: 300px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-    }
-    .input-container {
-        position: relative;
-        margin-bottom: 1rem;
-    }
-    #account-modal input {
-        width: 100%;
-        padding: 0.8rem;
-        border: 1px solid #555;
-        background: #2c2c2c;
-        color: #f0f0f0;
-        border-radius: 5px;
-        box-sizing: border-box;
-    }
-    .clear-input {
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        cursor: pointer;
-        color: #999;
-        font-weight: bold;
-    }
-    #account-modal .close-button {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: none;
-        border: none;
-        color: #f0f0f0;
-        font-size: 1.5rem;
-        cursor: pointer;
-    }
-    #history-panel {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.9);
-        z-index: 3500;
-        color: white;
-        padding: 2rem;
-        box-sizing: border-box;
-        display: none;
-        flex-direction: column;
-        align-items: center;
-    }
-    #history-panel h2 {
-        color: #4CAF50;
-    }
-    #history-panel .close-history {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        font-size: 2rem;
-        cursor: pointer;
-    }
   </style>
 </head>
 <body>
-  <div id="loader">Loading OpenCV.js...</div>
+  <div id="loader">Loading...</div>
   <div class="container">
     <h1>Wall Ball Rep Tracker</h1>
     <p>Use your camera to count your wall ball reps automatically.</p>
     <div id="reps-container">
       <div id="reps">Reps: 0</div>
-      <div id="timer-container">Time: 0s</div>
+      <div id="timer" style="display: none;">Time: 0s</div>
+      <div id="rpm" style="display: none;">RPM: 0</div>
+      <button id="save-button" class="control-button">Save</button>
     </div>
-    <button id="reset-button" class="control-button">Reset</button>
+    <div id="goal-container">
+      <div id="goal-controls">
+        <label for="goal-input">Goal:</label>
+        <div class="goal-input-wrapper">
+          <button class="goal-adjust-button" id="goal-minus">-</button>
+          <input type="number" id="goal-input" min="10" max="500" value="100">
+          <button class="goal-adjust-button" id="goal-plus">+</button>
+        </div>
+      </div>
+      <div id="progress-bar-container">
+        <div id="progress-bar"></div>
+      </div>
+    </div>
+    <div id="menu-icon">
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+    <div id="nav-drawer">
+        <div id="user-container" style="margin-top: 1rem;">
+          <span id="user-greeting"></span>
+          <button id="login-button" class="control-button">Login/Sign Up</button>
+          <button id="leaderboard-button" class="control-button">Leaderboard</button>
+          <button id="session-history-button" class="control-button">History</button>
+          <button id="view-toggle" class="control-button">Show Dots</button>
+          <div class="toggle-switch-container">
+            <label for="timer-rpm-toggle">Show Timer/RPM</label>
+            <label class="switch">
+              <input type="checkbox" id="timer-rpm-toggle">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+    </div>
     <canvas id="canvas"></canvas>
+    <div id="controls-container">
+      <button id="focus-mode-button" class="control-button">Focus Mode</button>
+    </div>
+    <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
+      Requesting camera access...
+    </div>
     <video id="video" autoplay playsinline muted style="display: none;"></video>
-    <button id="focus-mode-button" class="control-button">Focus Mode</button>
+    <div id="notification" style="display:none; position: fixed; top: 20px; right: 20px; background-color: #4CAF50; color: white; padding: 15px; border-radius: 5px; z-index: 1000;"></div>
   </div>
 
-  <div id="hamburger-menu" class="menu-closed">
-    <div id="menu-icon">&#9776;</div>
-    <div id="menu-items">
-        <div class="menu-item" id="account-label">Account</div>
-        <div class="menu-item" id="history-label">History</div>
-        <div class="menu-item">
-            <label for="toggle-detection">Show Ball Detection</label>
-            <label class="toggle-label">
-                <input type="checkbox" id="toggle-detection">
-                <span class="toggle-switch"></span>
-            </label>
-        </div>
-        <div class="menu-item">
-            <label for="toggle-timer">Show Timer</label>
-            <label class="toggle-label">
-                <input type="checkbox" id="toggle-timer" checked>
-                <span class="toggle-switch"></span>
-            </label>
-        </div>
+  <div id="login-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Login or Sign Up</h2>
+      <input type="text" id="username-input" placeholder="Enter your username">
+      <input type="password" id="password-input" placeholder="Enter your password">
+      <button id="login-submit" class="control-button">Go</button>
+      <p id="login-error" style="color:red; display:none;"></p>
     </div>
   </div>
 
-  <div id="account-modal" style="display:none;">
-      <button class="close-button">&times;</button>
-      <h2>Account</h2>
-      <div class="input-container">
-        <input type="text" id="username" placeholder="Username">
-        <span class="clear-input" data-for="username">&times;</span>
-      </div>
-      <div class="input-container">
-        <input type="password" id="password" placeholder="Password">
-        <span class="clear-input" data-for="password">&times;</span>
-      </div>
-      <button id="login-button" class="control-button">Login</button>
+  <div id="leaderboard-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Leaderboard</h2>
+      <ol id="leaderboard-list"></ol>
+    </div>
   </div>
 
-  <div id="history-panel">
-      <span class="close-history">&times;</span>
-      <h2>Workout History</h2>
-      <div id="history-content">Your saved sessions will appear here.</div>
+  <div id="session-history-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Session History</h2>
+      <ul id="session-history-list"></ul>
+    </div>
   </div>
-
   <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg" preload="auto"></audio>
 
   <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const repsDisplay = document.getElementById('reps');
-    const repSound = document.getElementById('rep-sound');
-    const loader = document.getElementById('loader');
-
-    let reps = 0;
-    let repTimestamps = [];
-    let showDetection = false;
-    let timerInterval;
-    let seconds = 0;
-
-    class LacrosseBallTracker {
-        constructor() {
-            this.ballState = 'waiting'; // waiting, ball_away, ball_returned
-            this.lastThrowTime = 0;
-            this.minTimeBetweenThrows = 1000; // 1 second
-            this.minBallRadius = 10;
-            this.maxBallRadius = 50;
-        }
-
-        detect(context, videoElement) {
-            let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
-            let gray = new cv.Mat();
-            let circles = new cv.Mat();
-
-            context.drawImage(videoElement, 0, 0, videoElement.width, videoElement.height);
-            src.data.set(context.getImageData(0, 0, videoElement.width, videoElement.height).data);
-
-            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-            cv.GaussianBlur(gray, gray, new cv.Size(9, 9), 2, 2);
-
-            cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, 45, 75, 40, this.minBallRadius, this.maxBallRadius);
-
-            let ballDetected = false;
-            if (showDetection) {
-              for (let i = 0; i < circles.cols; ++i) {
-                let x = circles.data32F[i * 3];
-                let y = circles.data32F[i * 3 + 1];
-                let radius = circles.data32F[i * 3 + 2];
-                let point = new cv.Point(x, y);
-                context.strokeStyle = '#00FF00';
-                context.lineWidth = 2;
-                context.beginPath();
-                context.arc(x, y, radius, 0, 2 * Math.PI);
-                  context.stroke();
-                  ballDetected = true;
-              }
-            } else {
-                ballDetected = circles.cols > 0;
-            }
-
-            const currentTime = Date.now();
-
-            if (this.ballState === 'waiting' && ballDetected) {
-                this.ballState = 'ball_present';
-            } else if (this.ballState === 'ball_present' && !ballDetected) {
-                this.ballState = 'ball_away';
-                this.lastThrowTime = currentTime;
-            } else if (this.ballState === 'ball_away' && ballDetected) {
-                if (currentTime - this.lastThrowTime > 300) { // Debounce to avoid counting bounces
-                    reps++;
-                    repsDisplay.textContent = `Reps: ${reps}`;
-                    repSound.play();
-                    this.ballState = 'ball_present';
-                    repTimestamps.push(currentTime);
-                }
-            } else if (this.ballState === 'ball_away' && !ballDetected) {
-                if (currentTime - this.lastThrowTime > 5000) { // Reset if ball is gone for too long
-                    this.ballState = 'waiting';
-                }
-            }
-
-            src.delete();
-            gray.delete();
-            circles.delete();
-        }
-    }
-
     async function setupCamera() {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      const video = document.getElementById('video');
+      const cameraStatus = document.getElementById('camera-status');
+      const repsDisplay = document.getElementById('reps');
+
+      repsDisplay.textContent = 'Initializing...';
+      cameraStatus.style.display = 'block';
+      cameraStatus.innerHTML = 'Checking camera permissions...';
+
+      try {
+        // Add a timeout for the getUserMedia request
+        const stream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user',
+                    frameRate: { ideal: 60 }
+                }
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out')), 10000))
+        ]);
+
         video.srcObject = stream;
-        return new Promise((resolve) => {
-            video.onloadedmetadata = () => {
-                video.width = video.videoWidth;
-                video.height = video.videoHeight;
-                canvas.width = video.width;
-                canvas.height = video.height;
-                resolve(video);
-            };
+        localStorage.setItem('wallBallCameraAccess', 'granted');
+        cameraStatus.innerHTML = 'Camera access granted. Loading video...';
+        
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Video load timeout')), 10000);
+          video.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            video.width = video.videoWidth;
+            video.height = video.videoHeight;
+            resolve();
+          };
         });
+
+        await video.play();
+        cameraStatus.style.display = 'none';
+        return video;
+      } catch (err) {
+        localStorage.setItem('wallBallCameraAccess', 'denied');
+        cameraStatus.innerHTML = 
+          `Camera access failed: ${err.message}. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>`;
+        repsDisplay.textContent = 'Camera Error';
+        console.error('Camera error:', err);
+        throw err;
+      }
+    }
+    
+    function requestCameraAgain() {
+      document.getElementById('camera-status').innerHTML = 'Requesting camera access...';
+      main().catch(err => {
+        console.error('Failed to initialize after retry:', err);
+      });
     }
 
-    function onOpenCvReady() {
-        loader.style.display = 'none';
-        main();
+    function drawPoint(ctx, y, x, r, color) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    function drawKeypoints(keypoints, ctx) {
+        for (let i = 0; i < keypoints.length; i++) {
+            const keypoint = keypoints[i];
+            if (keypoint.score > 0.5) {
+                drawPoint(ctx, keypoint.y, keypoint.x, 5, 'red');
+            }
+        }
+
     }
 
     async function main() {
-        await setupCamera();
-        const tracker = new LacrosseBallTracker();
+        const video = await setupCamera();
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.width;
+        canvas.height = video.height;
 
-        function gameLoop() {
-            tracker.detect(ctx, video);
-            requestAnimationFrame(gameLoop);
-        }
+        const detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'mediapipe', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose' });
 
-        function startTimer() {
-            if (timerInterval) clearInterval(timerInterval);
-            const timerContainer = document.getElementById('timer-container');
-            timerInterval = setInterval(() => {
-                seconds++;
-                let minutes = Math.floor(seconds / 60);
-                let remainingSeconds = seconds % 60;
-                timerContainer.textContent = `Time: ${minutes}m ${remainingSeconds}s`;
-            }, 1000);
-        }
+        let showDots = false;
 
-        function stopTimer() {
-            clearInterval(timerInterval);
-        }
-
-        function resetTimer() {
-            stopTimer();
-            seconds = 0;
-            document.getElementById('timer-container').textContent = 'Time: 0s';
-        }
-
-        gameLoop();
-        startTimer();
-
-        document.getElementById('reset-button').addEventListener('click', () => {
-            reps = 0;
-            repTimestamps = [];
-            repsDisplay.textContent = 'Reps: 0';
-            tracker.ballState = 'waiting';
-            resetTimer();
-            startTimer();
-        });
-
-        const hamburgerMenu = document.getElementById('hamburger-menu');
-        const menuIcon = document.getElementById('menu-icon');
-
-        menuIcon.addEventListener('click', (event) => {
-            hamburgerMenu.classList.toggle('menu-open');
-            event.stopPropagation();
-        });
-
-        window.addEventListener('click', (e) => {
-            if (hamburgerMenu.classList.contains('menu-open') && !hamburgerMenu.contains(e.target)) {
-                hamburgerMenu.classList.remove('menu-open');
-            }
-        });
-
-        document.getElementById('toggle-detection').addEventListener('change', (e) => {
-            showDetection = e.target.checked;
-        });
-
-        document.getElementById('toggle-timer').addEventListener('change', (e) => {
-            document.getElementById('timer-container').style.display = e.target.checked ? 'block' : 'none';
-            if(e.target.checked) {
-                startTimer();
-            } else {
-                stopTimer();
-            }
-        });
-
-        // Account Modal Logic
-        const accountModal = document.getElementById('account-modal');
-        document.getElementById('account-label').addEventListener('click', () => {
-            accountModal.style.display = 'block';
-            hamburgerMenu.classList.remove('menu-open');
-        });
-        accountModal.querySelector('.close-button').addEventListener('click', () => {
-            accountModal.style.display = 'none';
-        });
-        document.getElementById('login-button').addEventListener('click', () => {
-            // In a real app, you'd have login logic here.
-            accountModal.style.display = 'none';
-        });
-
-        // History Panel Logic
-        const historyPanel = document.getElementById('history-panel');
-        document.getElementById('history-label').addEventListener('click', () => {
-            historyPanel.style.display = 'flex';
-            hamburgerMenu.classList.remove('menu-open');
-        });
-        historyPanel.querySelector('.close-history').addEventListener('click', () => {
-            historyPanel.style.display = 'none';
-        });
-
-        document.querySelectorAll('.clear-input').forEach(span => {
-            span.addEventListener('click', (e) => {
-                const inputId = e.target.dataset.for;
-                document.getElementById(inputId).value = '';
-            });
+        const viewToggleButton = document.getElementById('view-toggle');
+        viewToggleButton.addEventListener('click', () => {
+            showDots = !showDots;
+            viewToggleButton.textContent = showDots ? 'Hide Dots' : 'Show Dots';
         });
 
         const focusModeButton = document.getElementById('focus-mode-button');
         focusModeButton.addEventListener('click', () => {
-            document.body.classList.toggle('focus-view');
+            document.body.classList.add('focus-view');
         });
+
+        const goalInput = document.getElementById('goal-input');
+        const progressBar = document.getElementById('progress-bar');
+        let goal = parseInt(goalInput.value);
+        resetReps();
+
+        goalInput.addEventListener('input', () => {
+            goal = parseInt(goalInput.value);
+            updateProgressBar();
+        });
+
+        document.getElementById('goal-plus').addEventListener('click', () => {
+            goalInput.value = parseInt(goalInput.value) + 10;
+            goal = parseInt(goalInput.value);
+            updateProgressBar();
+        });
+
+        document.getElementById('goal-minus').addEventListener('click', () => {
+            goalInput.value = parseInt(goalInput.value) - 10;
+            goal = parseInt(goalInput.value);
+            updateProgressBar();
+        });
+
+        function updateProgressBar() {
+            const progress = (reps / goal) * 100;
+            progressBar.style.width = `${Math.min(progress, 100)}%`;
+        }
+
+        let startTime = null;
+        const timerDisplay = document.getElementById('timer');
+        const rpmDisplay = document.getElementById('rpm');
+
+        function updateTimerAndRPM() {
+            if (!startTime) return;
+            const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+            timerDisplay.textContent = `Time: ${elapsedSeconds}s`;
+
+            if (elapsedSeconds > 0) {
+                const rpm = Math.round((reps / elapsedSeconds) * 60);
+                rpmDisplay.textContent = `RPM: ${rpm}`;
+            }
+        }
 
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && document.body.classList.contains('focus-view')) {
                 document.body.classList.remove('focus-view');
+                document.getElementById('focus-mode-button').textContent = 'Focus Mode';
             }
         });
 
@@ -541,14 +677,277 @@
                 document.body.classList.remove('focus-view');
             }
         });
+
+        async function detect() {
+            const poses = await detector.estimatePoses(video);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            updateTimerAndRPM();
+
+            if (poses.length > 0) {
+                const keypoints = poses[0].keypoints;
+                const handToTrack = 'right';
+
+                const wrist = keypoints.find(k => k.name === `${handToTrack}_wrist`);
+                const shoulder = keypoints.find(k => k.name === `${handToTrack}_shoulder`);
+
+                if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
+                    if (showDots) {
+                        drawKeypoints(keypoints, ctx);
+                    }
+
+                    if (wrist.y < shoulder.y - 15) { // Hand is above the shoulder
+                        stage = 'up';
+                    } else if (wrist.y > shoulder.y && stage === 'up') {
+                        if (!startTime) {
+                            startTime = Date.now();
+                        }
+                        reps++;
+                        stage = 'down';
+                        document.getElementById('reps').textContent = 'Reps: ' + reps;
+                        const repSound = document.getElementById('rep-sound');
+                        repSound.currentTime = 0;
+                        repSound.play().catch(e => console.error('Audio play failed:', e));
+                        updateProgressBar();
+                    }
+                }
+            }
+            if (window.poseDetectionActive) {
+                requestAnimationFrame(detect);
+            }
+        }
+
+        const loader = document.getElementById('loader');
+        loader.style.display = 'none';
+
+        window.poseDetectionActive = true;
+        detect();
     }
 
-    // Check if OpenCV is loaded
-    if (typeof cv !== 'undefined') {
-        onOpenCvReady();
-    } else {
-        const script = document.querySelector('script[src*="opencv.js"]');
-        script.onload = onOpenCvReady;
+
+    let reps = 0;
+    let stage = null; // 'up' or 'down'
+    let startTime = null;
+
+    function resetReps() {
+        reps = 0;
+        stage = null;
+        startTime = null;
+        document.getElementById('reps').textContent = 'Reps: 0';
+        document.getElementById('timer').textContent = 'Time: 0s';
+        document.getElementById('rpm').textContent = 'RPM: 0';
+        if (document.getElementById('progress-bar')) {
+            document.getElementById('progress-bar').style.width = '0%';
+        }
+    }
+
+    document.getElementById('save-button').addEventListener('click', () => {
+        // This button now effectively resets the session
+        resetReps();
+    });
+
+    document.getElementById('menu-icon').addEventListener('click', function() {
+      this.classList.toggle('open');
+      var drawer = document.getElementById('nav-drawer');
+      if (drawer.style.right === '0px' || drawer.style.right === '') {
+        drawer.style.right = window.innerWidth <= 600 ? '-100%' : '-300px';
+      } else {
+        drawer.style.right = '0px';
+      }
+    });
+
+    const timerRpmToggle = document.getElementById('timer-rpm-toggle');
+    const timerEl = document.getElementById('timer');
+    const rpmEl = document.getElementById('rpm');
+
+    function setTimerRpmVisibility() {
+        if (timerRpmToggle.checked) {
+            timerEl.style.display = 'block';
+            rpmEl.style.display = 'block';
+        } else {
+            timerEl.style.display = 'none';
+            rpmEl.style.display = 'none';
+        }
+    }
+
+    timerRpmToggle.addEventListener('change', setTimerRpmVisibility);
+
+    window.onload = () => {
+        setTimerRpmVisibility(); // Set initial state
+        main().catch(console.error);
+        setupUI();
+    };
+
+    window.onbeforeunload = () => {
+        // This can be left empty or removed if you only want manual saving
+    };
+
+    function setupUI() {
+      const loginModal = document.getElementById('login-modal');
+      const leaderboardModal = document.getElementById('leaderboard-modal');
+      const sessionHistoryModal = document.getElementById('session-history-modal');
+      const loginButton = document.getElementById('login-button');
+      const leaderboardButton = document.getElementById('leaderboard-button');
+      const sessionHistoryButton = document.getElementById('session-history-button');
+      const saveButton = document.getElementById('save-button');
+      const closeButtons = document.querySelectorAll('.close-button');
+
+      loginButton.onclick = () => loginModal.style.display = 'block';
+      leaderboardButton.onclick = () => {
+        updateLeaderboard();
+        leaderboardModal.style.display = 'block';
+      }
+
+      sessionHistoryButton.onclick = () => {
+        updateSessionHistory();
+        sessionHistoryModal.style.display = 'block';
+      }
+
+      saveButton.onclick = () => {
+        saveSession();
+        showNotification('Session saved!');
+      }
+
+      closeButtons.forEach(btn => {
+        btn.onclick = () => {
+          loginModal.style.display = 'none';
+          leaderboardModal.style.display = 'none';
+          sessionHistoryModal.style.display = 'none';
+        }
+      });
+
+      window.onclick = (event) => {
+        if (event.target == loginModal || event.target == leaderboardModal || event.target == sessionHistoryModal) {
+          loginModal.style.display = 'none';
+          leaderboardModal.style.display = 'none';
+          sessionHistoryModal.style.display = 'none';
+        }
+      }
+
+      document.getElementById('login-submit').onclick = () => {
+        const username = document.getElementById('username-input').value.trim();
+        const password = document.getElementById('password-input').value;
+        const loginError = document.getElementById('login-error');
+
+        if (username && password) {
+          if (login(username, password)) {
+            loginModal.style.display = 'none';
+            loginError.style.display = 'none';
+          } else {
+            loginError.textContent = 'Invalid username or password.';
+            loginError.style.display = 'block';
+          }
+        } else {
+            loginError.textContent = 'Username and password are required.';
+            loginError.style.display = 'block';
+        }
+      }
+
+      loadCurrentUser();
+    }
+
+    function login(username, password) {
+      let users = JSON.parse(localStorage.getItem('users')) || {};
+      // Simple hash function for demonstration purposes
+      const passHash = password.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0).toString();
+
+      if (users[username]) { // Login
+        if (users[username] === passHash) {
+          localStorage.setItem('currentUser', username);
+          loadCurrentUser();
+          return true;
+        }
+      } else { // Sign up
+        users[username] = passHash;
+        localStorage.setItem('users', JSON.stringify(users));
+        localStorage.setItem('currentUser', username);
+        loadCurrentUser();
+        return true;
+      }
+      return false;
+    }
+
+    function loadCurrentUser() {
+      const username = localStorage.getItem('currentUser');
+      if (username) {
+        document.getElementById('user-greeting').textContent = `Welcome, ${username}`;
+        document.getElementById('login-button').textContent = 'Logout';
+        document.getElementById('login-button').onclick = logout;
+      } else {
+        document.getElementById('user-greeting').textContent = '';
+        document.getElementById('login-button').textContent = 'Login/Sign Up';
+        document.getElementById('login-button').onclick = () => document.getElementById('login-modal').style.display = 'block';
+      }
+    }
+
+    function logout() {
+      saveSession();
+      localStorage.removeItem('currentUser');
+      loadCurrentUser();
+    }
+
+    function saveSession() {
+      const username = localStorage.getItem('currentUser');
+      if (!username || reps === 0) return;
+
+      let sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      if (!sessions[username]) {
+          sessions[username] = [];
+      }
+
+      const highscore = sessions[username].reduce((max, session) => Math.max(max, session.reps), 0);
+      if (reps > highscore) {
+          showNotification('New high score!');
+      }
+
+      sessions[username].push({ date: new Date().toISOString(), reps: reps });
+      localStorage.setItem('sessions', JSON.stringify(sessions));
+    }
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.display = 'block';
+      setTimeout(() => {
+        notification.style.display = 'none';
+      }, 3000);
+    }
+
+    function updateLeaderboard() {
+      const sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      const leaderboardList = document.getElementById('leaderboard-list');
+      leaderboardList.innerHTML = '';
+
+      const highScores = Object.entries(sessions).map(([name, userSessions]) => {
+          const maxReps = userSessions.reduce((max, session) => Math.max(max, session.reps), 0);
+          return { name, score: maxReps };
+      });
+
+      highScores.sort((a, b) => b.score - a.score);
+
+      highScores.forEach(({ name, score }) => {
+          const li = document.createElement('li');
+          li.textContent = `${name}: ${score}`;
+          leaderboardList.appendChild(li);
+      });
+    }
+
+    function updateSessionHistory() {
+      const username = localStorage.getItem('currentUser');
+      const sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      const userSessions = sessions[username] || [];
+      const sessionList = document.getElementById('session-history-list');
+      sessionList.innerHTML = '';
+
+      userSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      userSessions.forEach(session => {
+          const li = document.createElement('li');
+          const date = new Date(session.date);
+          li.textContent = `Date: ${date.toLocaleDateString()}, Time: ${date.toLocaleTimeString()}, Reps: ${session.reps}`;
+          sessionList.appendChild(li);
+      });
     }
   </script>
 </body>
