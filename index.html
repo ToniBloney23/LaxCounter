@@ -625,15 +625,15 @@
             this.maxHistoryLength = 10;
             
             // Lacrosse ball specific parameters (regulation ball is 2.5 inches diameter)
-            this.minBallRadius = 15;  // Minimum radius for lacrosse ball detection (reduced for better detection)
-            this.maxBallRadius = 50;  // Maximum radius for lacrosse ball detection (increased range)
+            this.minBallRadius = 18;  // Minimum radius for lacrosse ball detection
+            this.maxBallRadius = 45;  // Maximum radius for lacrosse ball detection
             this.idealBallRadius = 30; // Ideal lacrosse ball radius in pixels
-            this.movementThreshold = 15; // Minimum movement to consider as significant (reduced for more sensitivity)
-            this.maxTrackingDistance = 150; // Maximum distance to track same ball (increased)
+            this.movementThreshold = 30; // Minimum movement to consider as significant (increased for less sensitivity)
+            this.maxTrackingDistance = 120; // Maximum distance to track same ball
             
-            // Detection quality thresholds (more lenient for better responsiveness)
-            this.minDetectionScore = 0.25; // Minimum score to accept a detection (reduced)
-            this.colorMatchThreshold = 0.2; // Minimum color match percentage (reduced)
+            // Detection quality thresholds (more conservative)
+            this.minDetectionScore = 0.35; // Minimum score to accept a detection (increased)
+            this.colorMatchThreshold = 0.25; // Minimum color match percentage (increased)
             
             // Lacrosse ball color ranges in HSV
             this.colorRanges = {
@@ -715,9 +715,9 @@
                     circles,
                     cv.HOUGH_GRADIENT,
                     1,              // dp: inverse ratio of accumulator resolution
-                    80,             // minDist: minimum distance between circle centers (reduced)
-                    100,            // param1: upper threshold for edge detection (reduced for more sensitivity)
-                    30,             // param2: accumulator threshold for center detection (reduced for more detections)
+                    100,            // minDist: minimum distance between circle centers (increased for less sensitivity)
+                    130,            // param1: upper threshold for edge detection (increased for less sensitivity)
+                    45,             // param2: accumulator threshold for center detection (increased for fewer detections)
                     this.minBallRadius,  // minRadius
                     this.maxBallRadius   // maxRadius
                 );
@@ -1015,7 +1015,7 @@
             
             const avgMovement = totalMovement / (recent.length - 1);
             const isSignificantMovement = avgMovement > this.movementThreshold;
-            const isVerticalMovement = verticalMovement > totalMovement * 0.4; // Reduced threshold for more sensitivity
+            const isVerticalMovement = verticalMovement > totalMovement * 0.7; // Increased threshold for less sensitivity - requires clear vertical movement
             
             return {
                 isThrow: isSignificantMovement && isVerticalMovement,
@@ -1116,9 +1116,9 @@
         let repState = 'waiting'; // 'waiting', 'ball_present', 'ball_away', 'ball_returned'
         let lastThrowTime = 0;
         let ballAbsentTime = 0;
-        const minTimeBetweenThrows = 500; // Minimum 500ms between throws (reduced for more responsiveness)
-        const minAbsentTime = 200; // Ball must be absent for at least 200ms (reduced)
-        const ballAbsentThreshold = 2; // Number of consecutive frames without ball (reduced)
+        const minTimeBetweenThrows = 1200; // Minimum 1200ms between throws (increased for less sensitivity)
+            const minAbsentTime = 600; // Ball must be absent for at least 600ms (increased for clear separation)
+            const ballAbsentThreshold = 5; // Number of consecutive frames without ball (increased for more certainty)
         let consecutiveAbsentFrames = 0;
 
         async function detect() {
