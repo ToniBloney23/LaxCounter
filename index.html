@@ -485,6 +485,13 @@
               <span class="slider round"></span>
             </label>
           </div>
+          <div class="toggle-switch-container">
+            <label for="sound-toggle">Sound</label>
+            <label class="switch">
+              <input type="checkbox" id="sound-toggle" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
         </div>
     </div>
     <canvas id="canvas"></canvas>
@@ -525,7 +532,7 @@
       <ul id="session-history-list"></ul>
     </div>
   </div>
-  <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg" preload="auto"></audio>
+  <audio id="rep-sound" src="https://cdn.pixabay.com/download/audio/2022/10/26/audio_c346a8ca9b.mp3?filename=tennis-ball-hit-121292.mp3" preload="auto"></audio>
 
   <script>
     async function setupCamera() {
@@ -572,8 +579,17 @@
         return video;
       } catch (err) {
         localStorage.setItem('wallBallCameraAccess', 'denied');
-        cameraStatus.innerHTML = 
-          `Camera access failed: ${err.message}. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>`;
+        let errorMessage = `Camera access failed: ${err.message}.`;
+        if (err.name === 'NotAllowedError') {
+            errorMessage += '<br>Please grant camera permissions in your browser settings and refresh the page.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            errorMessage += '<br>No camera found. Please ensure a camera is connected and enabled.';
+        } else {
+            errorMessage += '<br>Please ensure your camera is not being used by another application.';
+        }
+        errorMessage += ' <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
+        
+        cameraStatus.innerHTML = errorMessage;
         repsDisplay.textContent = 'Camera Error';
         console.error('Camera error:', err);
         console.log('setupCamera: error');
@@ -664,6 +680,13 @@
 
 
 
+        const soundToggle = document.getElementById('sound-toggle');
+        const repSound = document.getElementById('rep-sound');
+
+        soundToggle.addEventListener('change', () => {
+            repSound.muted = !soundToggle.checked;
+        });
+
         const timerDisplay = document.getElementById('timer');
         const rpmDisplay = document.getElementById('rpm');
 
@@ -741,9 +764,11 @@
                                 }
                                 reps++;
                                 document.getElementById('reps').textContent = 'Reps: ' + reps;
-                                const repSound = document.getElementById('rep-sound');
-                                repSound.currentTime = 0;
-                                repSound.play().catch(e => console.error('Error playing sound:', e));
+                                if (soundToggle.checked) {
+                                    const repSound = document.getElementById('rep-sound');
+                                    repSound.currentTime = 0;
+                                    repSound.play().catch(e => console.error('Error playing sound:', e));
+                                }
                                 updateProgressBar();
                                 stage = 'start'; // Reset for next rep
                             }
@@ -782,6 +807,12 @@
             progressBar.style.width = '0%';
         }
     }
+
+    main().catch(err => {
+        console.error("Initialization failed:", err);
+        const loader = document.getElementById('loader');
+        loader.textContent = "Failed to initialize. Please check console for errors.";
+    });
 
     document.getElementById('save-button').addEventListener('click', () => {
         // This button now effectively resets the session
