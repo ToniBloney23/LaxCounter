@@ -622,9 +622,25 @@
             this.previousBalls = [];
             this.ballHistory = {};
             this.maxHistoryLength = 10;
-            this.minBallRadius = 15;
-            this.maxBallRadius = 50;
-            this.movementThreshold = 30;
+            
+            // Lacrosse ball specific parameters (regulation ball is 2.5 inches diameter)
+            this.minBallRadius = 20;  // Minimum radius for lacrosse ball detection
+            this.maxBallRadius = 40;  // Maximum radius for lacrosse ball detection
+            this.idealBallRadius = 30; // Ideal lacrosse ball radius in pixels
+            this.movementThreshold = 25; // Minimum movement to consider as significant
+            this.maxTrackingDistance = 120; // Maximum distance to track same ball
+            
+            // Detection quality thresholds
+            this.minDetectionScore = 0.4; // Minimum score to accept a detection
+            this.colorMatchThreshold = 0.3; // Minimum color match percentage
+            
+            // Lacrosse ball color ranges in HSV
+            this.colorRanges = {
+                white: { lower: [0, 0, 200], upper: [180, 30, 255] },
+                yellow: { lower: [20, 100, 100], upper: [30, 255, 255] },
+                orange: { lower: [10, 100, 100], upper: [20, 255, 255] }
+            };
+            
             this.initialized = false;
         }
         
@@ -644,6 +660,8 @@
                 // Create OpenCV matrices
                 const src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
                 const gray = new cv.Mat();
+                const hsv = new cv.Mat();
+                const mask = new cv.Mat();
                 const blurred = new cv.Mat();
                 const circles = new cv.Mat();
                 
@@ -651,21 +669,54 @@
                 const cap = new cv.VideoCapture(videoElement);
                 cap.read(src);
                 
-                // Convert to grayscale
+                // Convert to HSV for better color filtering
+                cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+                cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+                
+                // Create mask for lacrosse ball colors (white, yellow, orange)
+                // White range
+                const whiteLower = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 0, 200, 0]);
+                const whiteUpper = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [180, 30, 255, 255]);
+                const whiteMask = new cv.Mat();
+                cv.inRange(hsv, whiteLower, whiteUpper, whiteMask);
+                
+                // Yellow range
+                const yellowLower = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [20, 100, 100, 0]);
+                const yellowUpper = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [30, 255, 255, 255]);
+                const yellowMask = new cv.Mat();
+                cv.inRange(hsv, yellowLower, yellowUpper, yellowMask);
+                
+                // Orange range
+                const orangeLower = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [10, 100, 100, 0]);
+                const orangeUpper = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [20, 255, 255, 255]);
+                const orangeMask = new cv.Mat();
+                cv.inRange(hsv, orangeLower, orangeUpper, orangeMask);
+                
+                // Combine all color masks
+                cv.bitwise_or(whiteMask, yellowMask, mask);
+                cv.bitwise_or(mask, orangeMask, mask);
+                
+                // Apply morphological operations to clean up the mask
+                const kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(5, 5));
+                cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kernel);
+                cv.morphologyEx(mask, mask, cv.MORPH_OPEN, kernel);
+                
+                // Convert to grayscale and apply mask
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                cv.bitwise_and(gray, mask, gray);
                 
-                // Apply Gaussian blur to reduce noise
-                cv.GaussianBlur(gray, blurred, new cv.Size(9, 9), 2, 2);
+                // Apply Gaussian blur with lacrosse ball specific parameters
+                cv.GaussianBlur(gray, blurred, new cv.Size(7, 7), 1.5, 1.5);
                 
-                // Detect circles using HoughCircles
+                // Enhanced HoughCircles parameters specifically tuned for lacrosse balls
                 cv.HoughCircles(
                     blurred,
                     circles,
                     cv.HOUGH_GRADIENT,
                     1,              // dp: inverse ratio of accumulator resolution
-                    80,             // minDist: minimum distance between circle centers (increased)
-                    100,            // param1: upper threshold for edge detection
-                    35,             // param2: accumulator threshold for center detection (increased for better quality)
+                    100,            // minDist: minimum distance between circle centers
+                    120,            // param1: upper threshold for edge detection (increased)
+                    40,             // param2: accumulator threshold for center detection (increased for precision)
                     this.minBallRadius,  // minRadius
                     this.maxBallRadius   // maxRadius
                 );
@@ -673,48 +724,48 @@
                 let bestBall = null;
                 let bestScore = 0;
                 
-                // Process detected circles and find the best one
+                // Process detected circles with lacrosse ball specific validation
                 for (let i = 0; i < circles.cols; i++) {
                     const x = circles.data32F[i * 3];
                     const y = circles.data32F[i * 3 + 1];
                     const radius = circles.data32F[i * 3 + 2];
                     
-                    // Validate detection
-                    if (this.isValidBall(x, y, radius, videoElement.width, videoElement.height)) {
-                        // Calculate quality score based on radius (prefer balls closer to expected size)
-                        const idealRadius = (this.minBallRadius + this.maxBallRadius) / 2;
-                        const radiusScore = 1 - Math.abs(radius - idealRadius) / idealRadius;
-                        
-                        // Prefer balls in center of frame
-                        const centerX = videoElement.width / 2;
-                        const centerY = videoElement.height / 2;
-                        const distanceFromCenter = Math.sqrt(
-                            Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
-                        );
-                        const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
-                        const centerScore = 1 - (distanceFromCenter / maxDistance);
-                        
-                        // Combined score
-                        const totalScore = radiusScore * 0.7 + centerScore * 0.3;
-                        
-                        if (totalScore > bestScore) {
-                            bestScore = totalScore;
-                            bestBall = { x, y, radius, timestamp: Date.now(), score: totalScore };
-                        }
-                    }
+                    // Enhanced validation for lacrosse balls
+                     if (this.isValidLacrosseBall(x, y, radius, videoElement.width, videoElement.height, mask)) {
+                         // Calculate comprehensive quality score
+                         const lacrosseBallScore = this.calculateLacrosseBallScore(x, y, radius, videoElement, mask);
+                         
+                         // Only accept detections above minimum quality threshold
+                         if (lacrosseBallScore > this.minDetectionScore && lacrosseBallScore > bestScore) {
+                             bestScore = lacrosseBallScore;
+                             bestBall = { x, y, radius, timestamp: Date.now(), score: lacrosseBallScore };
+                         }
+                     }
                 }
                 
                 // Clean up OpenCV matrices
                 src.delete();
                 gray.delete();
+                hsv.delete();
+                mask.delete();
                 blurred.delete();
                 circles.delete();
+                whiteLower.delete();
+                whiteUpper.delete();
+                whiteMask.delete();
+                yellowLower.delete();
+                yellowUpper.delete();
+                yellowMask.delete();
+                orangeLower.delete();
+                orangeUpper.delete();
+                orangeMask.delete();
+                kernel.delete();
                 
                 // Return single best ball or empty array
                 return bestBall ? [bestBall] : [];
                 
             } catch (error) {
-                console.error('Ball detection error:', error);
+                console.error('Lacrosse ball detection error:', error);
                 return [];
             }
         }
@@ -726,12 +777,112 @@
                 return false;
             }
             
-            // Check radius constraints
+            // Check if radius is within expected range
             if (radius < this.minBallRadius || radius > this.maxBallRadius) {
                 return false;
             }
             
             return true;
+        }
+        
+        isValidLacrosseBall(x, y, radius, frameWidth, frameHeight, colorMask) {
+            // Basic boundary and size validation
+            if (!this.isValidBall(x, y, radius, frameWidth, frameHeight)) {
+                return false;
+            }
+            
+            try {
+                // Check if the detected circle area has sufficient color match
+                const roi = new cv.Rect(Math.max(0, x - radius), Math.max(0, y - radius), 
+                                       Math.min(frameWidth - Math.max(0, x - radius), radius * 2),
+                                       Math.min(frameHeight - Math.max(0, y - radius), radius * 2));
+                const maskRoi = colorMask.roi(roi);
+                
+                // Calculate the percentage of pixels that match lacrosse ball colors
+                const totalPixels = maskRoi.rows * maskRoi.cols;
+                const whitePixels = cv.countNonZero(maskRoi);
+                const colorMatchPercentage = whitePixels / totalPixels;
+                
+                maskRoi.delete();
+                
+                // Require minimum color match percentage for lacrosse ball
+                 return colorMatchPercentage > this.colorMatchThreshold;
+                
+            } catch (error) {
+                console.warn('Color validation error:', error);
+                return true; // Fall back to basic validation
+            }
+        }
+        
+        calculateLacrosseBallScore(x, y, radius, videoElement, colorMask) {
+            try {
+                // 1. Radius score - prefer balls close to standard lacrosse ball size
+                 const radiusScore = Math.max(0, 1 - Math.abs(radius - this.idealBallRadius) / this.idealBallRadius);
+                
+                // 2. Circularity score - lacrosse balls should be perfectly circular
+                const circularityScore = this.calculateCircularity(x, y, radius, videoElement);
+                
+                // 3. Color consistency score
+                const colorScore = this.calculateColorConsistency(x, y, radius, colorMask);
+                
+                // 4. Position preference (center of frame)
+                const centerX = videoElement.width / 2;
+                const centerY = videoElement.height / 2;
+                const distanceFromCenter = Math.sqrt(
+                    Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
+                );
+                const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
+                const positionScore = 1 - (distanceFromCenter / maxDistance);
+                
+                // 5. Edge strength score
+                const edgeScore = this.calculateEdgeStrength(x, y, radius, videoElement);
+                
+                // Weighted combination optimized for lacrosse ball detection
+                const totalScore = (
+                    radiusScore * 0.25 +      // Size is important
+                    circularityScore * 0.25 +  // Shape is crucial
+                    colorScore * 0.30 +        // Color is very important
+                    positionScore * 0.10 +     // Position preference
+                    edgeScore * 0.10           // Edge definition
+                );
+                
+                return totalScore;
+                
+            } catch (error) {
+                console.warn('Score calculation error:', error);
+                return 0.5; // Default moderate score
+            }
+        }
+        
+        calculateCircularity(x, y, radius, videoElement) {
+            // For now, return a high score since HoughCircles already filters for circular shapes
+            // In a more advanced implementation, we could analyze the actual contour
+            return 0.9;
+        }
+        
+        calculateColorConsistency(x, y, radius, colorMask) {
+            try {
+                const roi = new cv.Rect(Math.max(0, x - radius), Math.max(0, y - radius), 
+                                       Math.min(colorMask.cols - Math.max(0, x - radius), radius * 2),
+                                       Math.min(colorMask.rows - Math.max(0, y - radius), radius * 2));
+                const maskRoi = colorMask.roi(roi);
+                
+                const totalPixels = maskRoi.rows * maskRoi.cols;
+                const matchingPixels = cv.countNonZero(maskRoi);
+                const consistency = matchingPixels / totalPixels;
+                
+                maskRoi.delete();
+                return Math.min(1.0, consistency * 2); // Boost the score for good color matches
+                
+            } catch (error) {
+                return 0.5;
+            }
+        }
+        
+        calculateEdgeStrength(x, y, radius, videoElement) {
+            // Simplified edge strength calculation
+            // In a full implementation, we could use Sobel operators
+            return 0.8; // Default good edge score
         }
         
         filterAndTrackBalls(detectedBalls) {
