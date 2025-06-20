@@ -887,10 +887,14 @@
             }
         });
 
-        // Rep counting state machine
-        let repState = 'waiting'; // 'waiting', 'ball_detected', 'throw_started', 'throw_completed'
+        // Rep counting state machine - improved to prevent double counting
+        let repState = 'waiting'; // 'waiting', 'ball_present', 'ball_away', 'ball_returned'
         let lastThrowTime = 0;
-        const minTimeBetweenThrows = 500; // Minimum 500ms between throws
+        let ballAbsentTime = 0;
+        const minTimeBetweenThrows = 800; // Minimum 800ms between throws
+        const minAbsentTime = 300; // Ball must be absent for at least 300ms
+        const ballAbsentThreshold = 3; // Number of consecutive frames without ball
+        let consecutiveAbsentFrames = 0;
 
         async function detect() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -900,41 +904,38 @@
 
             if (ballTracker && ballTracker.initialized) {
                 const detectedBalls = ballTracker.detectBalls(video);
+                const currentTime = Date.now();
                 
                 if (showDetection && detectedBalls.length > 0) {
                     drawBallDetection(detectedBalls, ctx);
                 }
 
-                // Analyze ball movement for rep counting
+                // Improved rep counting logic
                 if (detectedBalls.length > 0) {
-                    const movement = ballTracker.analyzeMovementPattern();
-                    const currentTime = Date.now();
+                    consecutiveAbsentFrames = 0;
                     
                     // State machine for accurate rep counting
                     switch (repState) {
                         case 'waiting':
-                            if (detectedBalls.length > 0) {
-                                repState = 'ball_detected';
-                            }
+                            repState = 'ball_present';
                             break;
                             
-                        case 'ball_detected':
-                            if (movement.isThrow && movement.direction === 'up') {
-                                repState = 'throw_started';
-                            }
+                        case 'ball_present':
+                            // Stay in this state while ball is present
                             break;
                             
-                        case 'throw_started':
-                            if (movement.isThrow && movement.direction === 'down' && 
+                        case 'ball_away':
+                            // Ball has returned after being away
+                            if (currentTime - ballAbsentTime >= minAbsentTime && 
                                 currentTime - lastThrowTime > minTimeBetweenThrows) {
                                 
-                                // Count the rep
+                                // Count the rep - ball went away and came back
                                 if (!startTime) {
                                     startTime = Date.now();
                                 }
                                 reps++;
                                 lastThrowTime = currentTime;
-                                repState = 'throw_completed';
+                                repState = 'ball_returned';
                                 
                                 document.getElementById('reps').textContent = 'Reps: ' + reps;
                                 const repSound = document.getElementById('rep-sound');
@@ -948,30 +949,37 @@
                                 ctx.textAlign = 'center';
                                 ctx.fillText('REP!', canvas.width / 2, canvas.height / 2);
                                 ctx.textAlign = 'left';
+                            } else {
+                                repState = 'ball_present';
                             }
                             break;
                             
-                        case 'throw_completed':
-                            // Wait for ball to settle before detecting next throw
-                            if (movement.speed < 5) {
-                                repState = 'waiting';
-                            }
+                        case 'ball_returned':
+                            // Wait for ball to go away again before next rep
+                            repState = 'ball_present';
                             break;
                     }
-                    
-                    // Display current state for debugging
-                    if (showDetection) {
-                        ctx.fillStyle = '#FFFFFF';
-                        ctx.font = '16px Arial';
-                        ctx.fillText(`State: ${repState}`, 10, 30);
-                        ctx.fillText(`Movement: ${movement.direction || 'none'}`, 10, 50);
-                        ctx.fillText(`Speed: ${Math.round(movement.speed || 0)}`, 10, 70);
-                        ctx.fillText(`Balls: ${detectedBalls.length}`, 10, 90);
-                    }
                 } else {
-                    // No balls detected, reset to waiting state
-                    if (repState !== 'waiting') {
-                        repState = 'waiting';
+                    // No balls detected
+                    consecutiveAbsentFrames++;
+                    
+                    if (consecutiveAbsentFrames >= ballAbsentThreshold) {
+                        if (repState === 'ball_present' || repState === 'ball_returned') {
+                            repState = 'ball_away';
+                            ballAbsentTime = currentTime;
+                        }
+                    }
+                }
+                
+                // Display current state for debugging
+                if (showDetection) {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = '16px Arial';
+                    ctx.fillText(`State: ${repState}`, 10, 30);
+                    ctx.fillText(`Balls: ${detectedBalls.length}`, 10, 50);
+                    ctx.fillText(`Absent frames: ${consecutiveAbsentFrames}`, 10, 70);
+                    if (ballAbsentTime > 0) {
+                        ctx.fillText(`Absent time: ${currentTime - ballAbsentTime}ms`, 10, 90);
                     }
                 }
             } else {
