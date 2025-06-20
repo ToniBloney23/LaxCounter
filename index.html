@@ -1,41 +1,123 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Wall Ball Rep Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
   <style>
     body {
-      background: #121212;
-      color: #fff;
-      text-align: center;
-      font-family: sans-serif;
+      background: linear-gradient(to right, #232526, #414345);
+      color: #f0f0f0;
+      font-family: 'Poppins', sans-serif;
       margin: 0;
-      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
     }
     h1 {
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
+      font-size: 2.8rem;
+      color: #4CAF50;
+      animation: fadeInDown 1s ease-out;
+    }
+    p {
+      margin-bottom: 2rem;
+      font-size: 1.1rem;
+      color: #ccc;
     }
     #reps-container {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
+      font-size: 3rem;
+      margin-bottom: 1.5rem;
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 1rem;
+      gap: 1.5rem;
+      background: #2c2c2c;
+      padding: 1rem 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
-    #reset-button {
+    .control-button, #reset-button, #view-toggle {
       font-size: 1.2rem;
-      padding: 0.5rem 1rem;
-      background: #FF5722;
+      padding: 1rem 2rem;
       border: none;
-      border-radius: 5px;
+      border-radius: 25px;
       color: white;
       cursor: pointer;
-      transition: background 0.3s;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
+
+    #reset-button {
+      background-image: linear-gradient(to right, #f44336, #d32f2f);
+    }
+
     #reset-button:hover {
-      background: #F4511E;
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    #controls-container {
+      margin-top: 1.5rem;
+    }
+
+    #view-toggle {
+        background-image: linear-gradient(to right, #2196F3, #1976D2);
+    }
+
+    #view-toggle:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .focus-view h1,
+    .focus-view p,
+    .focus-view #menu-icon,
+    .focus-view #save-button,
+    .focus-view #reset-button,
+    .focus-view canvas,
+    .focus-view #nav-drawer,
+    .focus-view #view-toggle,
+    .focus-view #focus-mode-button {
+        display: none;
+    }
+
+    .focus-view #reps-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: #000;
+        z-index: 2000;
+    }
+
+    .focus-view #reps {
+        font-size: 25vw;
+        color: #4CAF50;
+    }
+
+    .focus-view #focus-mode-button {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 2001;
     }
     .retry-button {
       font-size: 1rem;
@@ -56,98 +138,271 @@
     }
     canvas {
       max-width: 100%;
-      width: 640px;
-      height: 480px;
+      width: 100%;
+      height: auto;
       border-radius: 10px;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
       display: block;
-      margin: 0 auto;
+      margin: 1rem auto;
     }
+    .control-button {
+        background-image: linear-gradient(to right, #2196F3, #1976D2);
+    }
+    .control-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+    .modal {
+        position: fixed; 
+        z-index: 1; 
+        left: 0;
+        top: 0;
+        width: 100%; 
+        height: 100%; 
+        overflow: auto; 
+        background-color: rgba(0,0,0,0.6);
+    }
+    .modal-content {
+        background: #333;
+        margin: 15% auto; 
+        padding: 25px;
+        border: none;
+        width: 90%;
+        max-width: 400px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .close-button {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+    .close-button:hover,
+    .close-button:focus {
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    #login-modal input {
+      width: calc(100% - 20px);
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #555;
+      background: #444;
+      color: #f0f0f0;
+    }
+
+    #leaderboard-list li, #session-history-list li {
+      background: #444;
+      margin-bottom: 8px;
+      padding: 12px;
+      border-radius: 8px;
+      list-style-position: inside;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    #leaderboard-list li:hover, #session-history-list li:hover {
+      background-color: #555;
+      transform: scale(1.02);
+    }
+
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 2rem;
+      }
+      p {
+        font-size: 1rem;
+      }
+      #reps-container {
+        font-size: 2rem;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+      }
+      .container {
+        padding: 1rem;
+      }
+      #user-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .control-button {
+        width: 100%;
+        text-align: center;
+      }
+      #nav-drawer {
+        width: 100%;
+        right: -100%;
+      }
+      #menu-icon.open + #nav-drawer {
+        right: 0;
+      }
+    }
+
+    #menu-icon {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      cursor: pointer;
+      z-index: 1001;
+    }
+
+    #menu-icon div {
+      width: 35px;
+      height: 5px;
+      background-color: white;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    #nav-drawer {
+      position: fixed;
+      top: 0;
+      right: -300px; /* Start off-screen */
+      width: 250px;
+      height: 100%;
+      background-color: #333;
+      padding-top: 60px;
+      transition: 0.5s;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #nav-drawer .control-button {
+        width: 80%;
+        margin-bottom: 15px;
+    }
+
   </style>
 </head>
 <body>
-  <h1>Wall Ball Rep Tracker (Chrome)</h1>
-  <div id="controls-container" style="margin-bottom: 1rem;">
-    <label for="hand-select" style="margin-right: 0.5rem;">Track:</label>
-    <select id="hand-select" style="padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px;">
-      <option value="right">Right Hand</option>
-      <option value="left">Left Hand</option>
-      <option value="both">Both Hands</option>
-    </select>
-    <button id="view-toggle" style="margin-left: 1rem; padding: 0.5rem; background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">Toggle Lines</button>
+  <div class="container">
+    <h1>Wall Ball Rep Tracker</h1>
+    <p>Use your camera to count your wall ball reps automatically.</p>
+    <div id="reps-container">
+      <div id="reps">Reps: 0</div>
+      <button id="reset-button" onclick="resetReps()">Reset</button>
+      <button id="save-button" class="control-button">Save</button>
+    </div>
+    <div id="menu-icon">
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+    <div id="nav-drawer">
+        <div id="user-container" style="margin-top: 1rem;">
+          <span id="user-greeting"></span>
+          <button id="login-button" class="control-button">Login/Sign Up</button>
+          <button id="leaderboard-button" class="control-button">Leaderboard</button>
+          <button id="session-history-button" class="control-button">History</button>
+        </div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div id="controls-container">
+      <button id="view-toggle">Show Dots</button>
+      <button id="focus-mode-button" class="control-button">Focus Mode</button>
+    </div>
+    <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
+      Requesting camera access...
+    </div>
+    <video id="video" autoplay playsinline muted style="display: none;"></video>
+    <div id="notification" style="display:none; position: fixed; top: 20px; right: 20px; background-color: #4CAF50; color: white; padding: 15px; border-radius: 5px; z-index: 1000;"></div>
   </div>
-  <div id="reps-container">
-    <div id="reps">Reps: 0</div>
-    <button id="reset-button" onclick="resetReps()">Reset</button>
-  </div>
-  <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
-    Requesting camera access...
-  </div>
-  <video id="video" autoplay playsinline muted style="display: none;"></video>
-  <canvas id="canvas"></canvas>
 
-  <!-- TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0"></script>
-  <!-- Pose Detection -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+  <div id="login-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Login or Sign Up</h2>
+      <input type="text" id="username-input" placeholder="Enter your username">
+      <input type="password" id="password-input" placeholder="Enter your password">
+      <button id="login-submit" class="control-button">Go</button>
+      <p id="login-error" style="color:red; display:none;"></p>
+    </div>
+  </div>
+
+  <div id="leaderboard-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Leaderboard</h2>
+      <ol id="leaderboard-list"></ol>
+    </div>
+  </div>
+
+  <div id="session-history-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Session History</h2>
+      <ul id="session-history-list"></ul>
+    </div>
+  </div>
+  <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg"></audio>
 
   <script>
     async function setupCamera() {
       const video = document.getElementById('video');
-      
-      // Check if user has previously granted camera access
-      const cameraAccessGranted = localStorage.getItem('wallBallCameraAccess') === 'granted';
-      
-      // Show camera permission request message
-      document.getElementById('reps').textContent = 'Please allow camera access...';
-      document.getElementById('camera-status').style.display = 'block';
-      
-      if (cameraAccessGranted) {
-        document.getElementById('camera-status').innerHTML = 'Using saved camera permission...';
-      } else {
-        document.getElementById('camera-status').innerHTML = 'Requesting camera access...';
-      }
-      
+      const cameraStatus = document.getElementById('camera-status');
+      const repsDisplay = document.getElementById('reps');
+
+      repsDisplay.textContent = 'Initializing...';
+      cameraStatus.style.display = 'block';
+      cameraStatus.innerHTML = 'Checking camera permissions...';
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: 'user'
-          }
-        });
+        // Add a timeout for the getUserMedia request
+        const stream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                }
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out')), 10000))
+        ]);
+
         video.srcObject = stream;
-        
-        // Save camera access permission
         localStorage.setItem('wallBallCameraAccess', 'granted');
+        cameraStatus.innerHTML = 'Camera access granted. Loading video...';
         
-        // Hide camera permission message once access is granted
-        document.getElementById('camera-status').style.display = 'none';
-        
-        // Wait for video to be fully loaded
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Video load timeout')), 10000);
           video.onloadedmetadata = () => {
+            clearTimeout(timeout);
             video.width = video.videoWidth;
             video.height = video.videoHeight;
-            console.log('Video metadata loaded:', {
-              width: video.width,
-              height: video.height,
-              videoWidth: video.videoWidth,
-              videoHeight: video.videoHeight
-            });
             resolve();
           };
         });
 
         await video.play();
+        cameraStatus.style.display = 'none';
+        resetReps(); // Use resetReps to initialize counter and stage
         return video;
       } catch (err) {
-        // Save that camera access was denied
         localStorage.setItem('wallBallCameraAccess', 'denied');
-        
-        document.getElementById('camera-status').innerHTML = 
-          'Camera access denied or unavailable. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>';
-        console.error('Camera error:', err.message);
+        cameraStatus.innerHTML = 
+          `Camera access failed: ${err.message}. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>`;
+        repsDisplay.textContent = 'Camera Error';
+        console.error('Camera error:', err);
         throw err;
       }
     }
@@ -159,336 +414,290 @@
       });
     }
 
-    async function main() {
-      const video = await setupCamera();
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-
-      // Log video element properties
-      console.log('Video element:', {
-        offsetWidth: video.offsetWidth,
-        offsetHeight: video.offsetHeight,
-        clientWidth: video.clientWidth,
-        clientHeight: video.clientHeight,
-        style: video.style.cssText
-      });
-      
-      // Set canvas dimensions to match video
-      canvas.width = video.width;
-      canvas.height = video.height;
-      
-      // Log canvas dimensions
-      console.log('Canvas dimensions set:', {
-        canvasWidth: canvas.width,
-        canvasHeight: canvas.height,
-        drawingBufferWidth: ctx.drawingBufferWidth,
-        drawingBufferHeight: ctx.drawingBufferHeight
-      });
-
-      // Test drawing video frame
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      console.log('Image data retrieved:', {
-        width: imageData.width,
-        height: imageData.height,
-        dataLength: imageData.data.length
-      });
-
-      // Initialize TensorFlow
-      document.getElementById('reps').textContent = 'Initializing...';
-      try {
-        await tf.setBackend('webgl');
-        await tf.ready();
-        console.log('TensorFlow initialized with backend:', tf.getBackend());
-      } catch (error) {
-        console.error('TensorFlow initialization error:', error);
-        document.getElementById('reps').textContent = 'Error: Could not initialize TensorFlow';
-        return;
-      }
-      document.getElementById('reps').textContent = 'Loading pose detection...';
-
-
-      let detector;
-      try {
-        detector = await poseDetection.createDetector(
-          poseDetection.SupportedModels.BlazePose,
-          { runtime: 'tfjs', modelType: 'full' }
-        );
-        console.log('Pose detector created successfully');
-        document.getElementById('reps').textContent = 'Reps: 0';
-      } catch (error) {
-        console.error('Pose detector creation error:', error);
-        document.getElementById('reps').textContent = 'Error: Could not initialize pose detection';
-        return;
-      }
-
-      let reps = 0;
-      let rightStage = null;
-      let leftStage = null;
-      let lastRepTime = 0;
-      const REP_COOLDOWN = 1000; // Minimum time (ms) between reps
-      
-      // Get saved hand preference from localStorage or default to right
-      let selectedHand = localStorage.getItem('wallBallSelectedHand') || "right";
-      
-      // Update dropdown to match saved preference
-      document.getElementById('hand-select').value = selectedHand;
-
-      function drawPoint(kp, color) {
-        if (!kp || typeof kp.x !== 'number' || typeof kp.y !== 'number') {
-          console.log('Invalid keypoint:', kp);
-          return;
-        }
+    function drawPoint(ctx, y, x, r, color) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(kp.x, kp.y, 8, 0, 2 * Math.PI);
         ctx.fill();
-        
-        // Draw coordinate text
-        ctx.fillStyle = 'white';
-        ctx.font = '12px Arial';
-        ctx.fillText(`(${Math.round(kp.x)},${Math.round(kp.y)})`, kp.x + 10, kp.y);
-      }
-
-      function drawLine(kp1, kp2, color) {
-        if (!kp1 || !kp2 || typeof kp1.x !== 'number' || typeof kp1.y !== 'number' || 
-            typeof kp2.x !== 'number' || typeof kp2.y !== 'number') return;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(kp1.x, kp1.y);
-        ctx.lineTo(kp2.x, kp2.y);
-        ctx.stroke();
-      }
-
-      let showLines = true; // Add this near the top of the script with other variables
-      
-      async function detect() {
-        let poses = [];
-        try {
-          // Log video dimensions and readiness
-          console.log('Video state:', {
-            width: video.videoWidth,
-            height: video.videoHeight,
-            ready: video.readyState,
-            time: video.currentTime
-          });
-
-          poses = await detector.estimatePoses(video, {
-            flipHorizontal: false,
-            maxPoses: 1,
-            scoreThreshold: 0.2,
-            modelType: 'full'
-          });
-
-          // Log pose detection results
-          console.log('Pose detection result:', {
-            posesLength: poses.length,
-            firstPoseKeypoints: poses[0]?.keypoints?.length || 0
-          });
-        } catch (error) {
-          console.error('Pose detection error:', error);
-        }
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        if (!showLines) {
-          requestAnimationFrame(detect);
-          return;
-        }
-        
-        // Display detection status
-        ctx.fillStyle = 'white';
-        ctx.font = '16px Arial';
-        ctx.fillText(`Poses detected: ${poses.length}`, 10, 20);
-
-        if (poses.length > 0) {
-          const kp = poses[0].keypoints;
-          
-          // Get selected hand from dropdown
-          selectedHand = document.getElementById('hand-select').value;
-          
-          // Define connections and points based on selected hand
-          let connections = [];
-          let armPoints = [];
-          
-          if (selectedHand === 'right' || selectedHand === 'both') {
-            connections.push(['right_shoulder', 'right_elbow'], ['right_elbow', 'right_wrist']);
-            armPoints.push('right_shoulder', 'right_elbow', 'right_wrist');
-          }
-          
-          if (selectedHand === 'left' || selectedHand === 'both') {
-            connections.push(['left_shoulder', 'left_elbow'], ['left_elbow', 'left_wrist']);
-            armPoints.push('left_shoulder', 'left_elbow', 'left_wrist');
-          }
-          
-          // Draw arm skeleton lines
-          connections.forEach(([p1Name, p2Name]) => {
-            const p1 = kp.find(p => p.name === p1Name);
-            const p2 = kp.find(p => p.name === p2Name);
-            if (p1 && p2 && p1.score > 0.3 && p2.score > 0.3) {
-              // Use different colors for right and left arms
-              const color = p1Name.includes('right') ? '#FF5722' : '#2196F3';
-              drawLine(p1, p2, color);
-            }
-          });
-
-          // Draw arm keypoints
-          kp.forEach(point => {
-            if (point && armPoints.includes(point.name)) {
-              console.log(`Keypoint ${point.name}:`, {
-                x: point.x,
-                y: point.y,
-                score: point.score,
-                visible: point.score > 0.2
-              });
-              
-              if (point.score > 0.2) {
-                // Use different colors for right and left keypoints
-                const color = point.name.includes('right') ? '#FF5722' : '#2196F3';
-                drawPoint(point, color);
-              }
-            }
-          });
-
-          // Track rep counting based on selected hand
-          const currentTime = Date.now();
-          const timeSinceLastRep = currentTime - lastRepTime;
-          let textY = 40; // Starting Y position for text
-          
-          // Process right hand if selected
-          if (selectedHand === 'right' || selectedHand === 'both') {
-            const rightWrist = kp.find(p => p.name === 'right_wrist');
-            const rightShoulder = kp.find(p => p.name === 'right_shoulder');
-            
-            if (rightWrist && rightShoulder) {
-              // Show confidence scores and coordinates
-              ctx.fillStyle = 'white';
-              ctx.font = '16px Arial';
-              const wristScore = rightWrist.score || 0;
-              const shoulderScore = rightShoulder.score || 0;
-              const wristX = rightWrist.x || 0;
-              const wristY = rightWrist.y || 0;
-              const shoulderX = rightShoulder.x || 0;
-              const shoulderY = rightShoulder.y || 0;
-              
-              ctx.fillText(`Right Wrist: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, textY);
-              textY += 20;
-              ctx.fillText(`Right Shoulder: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, textY);
-              textY += 20;
-              
-              if (rightWrist.score > 0.3 && rightShoulder.score > 0.3) {
-                // Show vertical distance
-                const distance = rightWrist.y - rightShoulder.y;
-                ctx.fillText(`Right vertical distance: ${distance.toFixed(0)}px`, 10, textY);
-                textY += 20;
-                ctx.fillText(`Right stage: ${rightStage || 'none'}`, 10, textY);
-                textY += 20;
-
-                // Check for lacrosse throwing motion
-                // Ready position: Hand must be significantly above shoulder
-                if (rightWrist.y < rightShoulder.y - 150 && rightWrist.score > 0.5 && rightShoulder.score > 0.5) {
-                  rightStage = 'ready';
-                }
-
-                // Follow through: Hand must move below shoulder with minimum time between reps
-                if (rightWrist.y > rightShoulder.y + 50 && 
-                    rightStage === 'ready' && 
-                    timeSinceLastRep > REP_COOLDOWN &&
-                    rightWrist.score > 0.5 && rightShoulder.score > 0.5) {
-                  reps++;
-                  rightStage = 'up';
-                  lastRepTime = currentTime;
-                  document.getElementById('reps').textContent = `Reps: ${reps}`;
-                }
-              }
-            }
-          }
-          
-          // Process left hand if selected
-          if (selectedHand === 'left' || selectedHand === 'both') {
-            const leftWrist = kp.find(p => p.name === 'left_wrist');
-            const leftShoulder = kp.find(p => p.name === 'left_shoulder');
-            
-            if (leftWrist && leftShoulder) {
-              // Show confidence scores and coordinates
-              ctx.fillStyle = 'white';
-              ctx.font = '16px Arial';
-              const wristScore = leftWrist.score || 0;
-              const shoulderScore = leftShoulder.score || 0;
-              const wristX = leftWrist.x || 0;
-              const wristY = leftWrist.y || 0;
-              const shoulderX = leftShoulder.x || 0;
-              const shoulderY = leftShoulder.y || 0;
-              
-              ctx.fillText(`Left Wrist: ${wristScore.toFixed(2)} (${wristX.toFixed(0)}, ${wristY.toFixed(0)})`, 10, textY);
-              textY += 20;
-              ctx.fillText(`Left Shoulder: ${shoulderScore.toFixed(2)} (${shoulderX.toFixed(0)}, ${shoulderY.toFixed(0)})`, 10, textY);
-              textY += 20;
-              
-              if (leftWrist.score > 0.3 && leftShoulder.score > 0.3) {
-                // Show vertical distance
-                const distance = leftWrist.y - leftShoulder.y;
-                ctx.fillText(`Left vertical distance: ${distance.toFixed(0)}px`, 10, textY);
-                textY += 20;
-                ctx.fillText(`Left stage: ${leftStage || 'none'}`, 10, textY);
-                textY += 20;
-
-                // Check for lacrosse throwing motion
-                // Ready position: Hand must be significantly above shoulder
-                if (leftWrist.y < leftShoulder.y - 150 && leftWrist.score > 0.5 && leftShoulder.score > 0.5) {
-                  leftStage = 'ready';
-                }
-
-                // Follow through: Hand must move below shoulder with minimum time between reps
-                if (leftWrist.y > leftShoulder.y + 50 && 
-                    leftStage === 'ready' && 
-                    timeSinceLastRep > REP_COOLDOWN &&
-                    leftWrist.score > 0.5 && leftShoulder.score > 0.5) {
-                  reps++;
-                  leftStage = 'up';
-                  lastRepTime = currentTime;
-                  document.getElementById('reps').textContent = `Reps: ${reps}`;
-                }
-              }
-            }
-          }
-        }
-
-        requestAnimationFrame(detect);
-      }
-
-      detect();
     }
+
+    function drawKeypoints(keypoints, ctx) {
+        for (let i = 0; i < keypoints.length; i++) {
+            const keypoint = keypoints[i];
+            if (keypoint.score > 0.5) {
+                drawPoint(ctx, keypoint.y, keypoint.x, 5, 'red');
+            }
+        }
+    }
+
+    async function main() {
+        const video = await setupCamera();
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.width;
+        canvas.height = video.height;
+
+        const detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'tfjs' });
+
+        let showDots = false;
+
+        const viewToggleButton = document.getElementById('view-toggle');
+        viewToggleButton.addEventListener('click', () => {
+            showDots = !showDots;
+            viewToggleButton.textContent = showDots ? 'Hide Dots' : 'Show Dots';
+        });
+
+        const focusModeButton = document.getElementById('focus-mode-button');
+        focusModeButton.addEventListener('click', () => {
+            document.body.classList.add('focus-view');
+        });
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && document.body.classList.contains('focus-view')) {
+                document.body.classList.remove('focus-view');
+                document.getElementById('focus-mode-button').textContent = 'Focus Mode';
+            }
+        });
+
+        document.getElementById('reps-container').addEventListener('click', () => {
+            if (document.body.classList.contains('focus-view')) {
+                document.body.classList.remove('focus-view');
+            }
+        });
+
+        async function detect() {
+            const poses = await detector.estimatePoses(video);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            if (poses.length > 0) {
+                const keypoints = poses[0].keypoints;
+                const trackedHand = 'right'; // Always track the right hand
+
+                const wrist = keypoints.find(k => k.name === `${trackedHand}_wrist`);
+                const shoulder = keypoints.find(k => k.name === `${trackedHand}_shoulder`);
+
+                if (wrist && shoulder && wrist.score > 0.5 && shoulder.score > 0.5) {
+                    if (showDots) {
+                        drawKeypoints(keypoints, ctx);
+                    }
+                    const distance = Math.abs(wrist.y - shoulder.y);
+
+                    // A rep is counted when the hand goes from above the shoulder to below it.
+                    if (wrist.y < shoulder.y - 15) { // Hand is above the shoulder
+                        stage = 'up';
+                    }
+                    if (wrist.y > shoulder.y + 15 && stage === 'up') { // Hand is below the shoulder
+                        stage = 'down';
+                        reps++;
+                        document.getElementById('reps').textContent = `Reps: ${reps}`;
+                        if (reps % 10 === 0) {
+                            document.getElementById('rep-sound').play();
+                        }
+                        stage = null; // Reset for next rep
+                    }
+                }
+            }
+            requestAnimationFrame(detect);
+        }
+
+        detect();
+    }
+
+    let reps = 0;
+    let stage = null; // 'up' or 'down'
 
     function resetReps() {
       reps = 0;
-      rightStage = null;
-      leftStage = null;
+      stage = null;
       document.getElementById('reps').textContent = 'Reps: 0';
     }
 
-    window.onload = () => {
-      if (window.tf && window.poseDetection) {
-        main();
-        
-        // Add event listener for hand selection change
-        document.getElementById('hand-select').addEventListener('change', function() {
-          // Save selection to localStorage
-          selectedHand = this.value;
-          localStorage.setItem('wallBallSelectedHand', selectedHand);
-        });
-        
-        // Add event listener for view toggle
-        document.getElementById('view-toggle').addEventListener('click', function() {
-          showLines = !showLines;
-          this.textContent = showLines ? 'Hide Lines' : 'Show Lines';
-        });
+    document.getElementById('menu-icon').addEventListener('click', function() {
+      this.classList.toggle('open');
+      var drawer = document.getElementById('nav-drawer');
+      if (drawer.style.right === '0px' || drawer.style.right === '') {
+        drawer.style.right = window.innerWidth <= 600 ? '-100%' : '-300px';
       } else {
-        alert('TensorFlow or poseDetection failed to load.');
+        drawer.style.right = '0px';
       }
+    });
+
+    window.onload = () => {
+        main().catch(console.error);
+        setupUI();
     };
+
+    window.onbeforeunload = () => {
+        // This can be left empty or removed if you only want manual saving
+    };
+
+    function setupUI() {
+      const loginModal = document.getElementById('login-modal');
+      const leaderboardModal = document.getElementById('leaderboard-modal');
+      const sessionHistoryModal = document.getElementById('session-history-modal');
+      const loginButton = document.getElementById('login-button');
+      const leaderboardButton = document.getElementById('leaderboard-button');
+      const sessionHistoryButton = document.getElementById('session-history-button');
+      const saveButton = document.getElementById('save-button');
+      const closeButtons = document.querySelectorAll('.close-button');
+
+      loginButton.onclick = () => loginModal.style.display = 'block';
+      leaderboardButton.onclick = () => {
+        updateLeaderboard();
+        leaderboardModal.style.display = 'block';
+      }
+
+      sessionHistoryButton.onclick = () => {
+        updateSessionHistory();
+        sessionHistoryModal.style.display = 'block';
+      }
+
+      saveButton.onclick = () => {
+        saveSession();
+        showNotification('Session saved!');
+      }
+
+      closeButtons.forEach(btn => {
+        btn.onclick = () => {
+          loginModal.style.display = 'none';
+          leaderboardModal.style.display = 'none';
+          sessionHistoryModal.style.display = 'none';
+        }
+      });
+
+      window.onclick = (event) => {
+        if (event.target == loginModal || event.target == leaderboardModal || event.target == sessionHistoryModal) {
+          loginModal.style.display = 'none';
+          leaderboardModal.style.display = 'none';
+          sessionHistoryModal.style.display = 'none';
+        }
+      }
+
+      document.getElementById('login-submit').onclick = () => {
+        const username = document.getElementById('username-input').value.trim();
+        const password = document.getElementById('password-input').value;
+        const loginError = document.getElementById('login-error');
+
+        if (username && password) {
+          if (login(username, password)) {
+            loginModal.style.display = 'none';
+            loginError.style.display = 'none';
+          } else {
+            loginError.textContent = 'Invalid username or password.';
+            loginError.style.display = 'block';
+          }
+        } else {
+            loginError.textContent = 'Username and password are required.';
+            loginError.style.display = 'block';
+        }
+      }
+
+      loadCurrentUser();
+    }
+
+    function login(username, password) {
+      let users = JSON.parse(localStorage.getItem('users')) || {};
+      // Simple hash function for demonstration purposes
+      const passHash = password.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0).toString();
+
+      if (users[username]) { // Login
+        if (users[username] === passHash) {
+          localStorage.setItem('currentUser', username);
+          loadCurrentUser();
+          return true;
+        }
+      } else { // Sign up
+        users[username] = passHash;
+        localStorage.setItem('users', JSON.stringify(users));
+        localStorage.setItem('currentUser', username);
+        loadCurrentUser();
+        return true;
+      }
+      return false;
+    }
+
+    function loadCurrentUser() {
+      const username = localStorage.getItem('currentUser');
+      if (username) {
+        document.getElementById('user-greeting').textContent = `Welcome, ${username}`;
+        document.getElementById('login-button').textContent = 'Logout';
+        document.getElementById('login-button').onclick = logout;
+      } else {
+        document.getElementById('user-greeting').textContent = '';
+        document.getElementById('login-button').textContent = 'Login/Sign Up';
+        document.getElementById('login-button').onclick = () => document.getElementById('login-modal').style.display = 'block';
+      }
+    }
+
+    function logout() {
+      saveSession();
+      localStorage.removeItem('currentUser');
+      loadCurrentUser();
+    }
+
+    function saveSession() {
+      const username = localStorage.getItem('currentUser');
+      if (!username || reps === 0) return;
+
+      let sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      if (!sessions[username]) {
+          sessions[username] = [];
+      }
+
+      const highscore = sessions[username].reduce((max, session) => Math.max(max, session.reps), 0);
+      if (reps > highscore) {
+          showNotification('New high score!');
+      }
+
+      sessions[username].push({ date: new Date().toISOString(), reps: reps });
+      localStorage.setItem('sessions', JSON.stringify(sessions));
+    }
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.display = 'block';
+      setTimeout(() => {
+        notification.style.display = 'none';
+      }, 3000);
+    }
+
+    function updateLeaderboard() {
+      const sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      const leaderboardList = document.getElementById('leaderboard-list');
+      leaderboardList.innerHTML = '';
+
+      const highScores = Object.entries(sessions).map(([name, userSessions]) => {
+          const maxReps = userSessions.reduce((max, session) => Math.max(max, session.reps), 0);
+          return { name, score: maxReps };
+      });
+
+      highScores.sort((a, b) => b.score - a.score);
+
+      highScores.forEach(({ name, score }) => {
+          const li = document.createElement('li');
+          li.textContent = `${name}: ${score}`;
+          leaderboardList.appendChild(li);
+      });
+    }
+
+    function updateSessionHistory() {
+      const username = localStorage.getItem('currentUser');
+      const sessions = JSON.parse(localStorage.getItem('sessions')) || {};
+      const userSessions = sessions[username] || [];
+      const sessionList = document.getElementById('session-history-list');
+      sessionList.innerHTML = '';
+
+      userSessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      userSessions.forEach(session => {
+          const li = document.createElement('li');
+          const date = new Date(session.date);
+          li.textContent = `Date: ${date.toLocaleDateString()}, Time: ${date.toLocaleTimeString()}, Reps: ${session.reps}`;
+          sessionList.appendChild(li);
+      });
+    }
   </script>
 </body>
 </html>
