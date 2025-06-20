@@ -489,6 +489,7 @@
     </div>
     <canvas id="canvas"></canvas>
     <div id="controls-container">
+      <button id="reset-button" class="control-button">Reset</button>
       <button id="focus-mode-button" class="control-button">Focus Mode</button>
     </div>
     <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
@@ -528,6 +529,7 @@
 
   <script>
     async function setupCamera() {
+      console.log('setupCamera: start');
       const video = document.getElementById('video');
       const cameraStatus = document.getElementById('camera-status');
       const repsDisplay = document.getElementById('reps');
@@ -566,6 +568,7 @@
 
         await video.play();
         cameraStatus.style.display = 'none';
+        console.log('setupCamera: success');
         return video;
       } catch (err) {
         localStorage.setItem('wallBallCameraAccess', 'denied');
@@ -573,6 +576,7 @@
           `Camera access failed: ${err.message}. <button onclick="requestCameraAgain()" class="retry-button">Try Again</button>`;
         repsDisplay.textContent = 'Camera Error';
         console.error('Camera error:', err);
+        console.log('setupCamera: error');
         throw err;
       }
     }
@@ -601,7 +605,12 @@
 
     }
 
+    let reps = 0;
+    let stage = null;
+    let startTime = null;
+
     async function main() {
+        console.log('main: start');
         const video = await setupCamera();
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -623,11 +632,13 @@
             document.body.classList.add('focus-view');
         });
 
+        const resetButton = document.getElementById('reset-button');
+        resetButton.addEventListener('click', resetReps);
+
         const goalInput = document.getElementById('goal-input');
         const progressBar = document.getElementById('progress-bar');
         let goal = parseInt(goalInput.value);
-        let stage = 'start'; // Initial state
-        resetReps();
+        updateProgressBar();
 
         goalInput.addEventListener('input', () => {
             goal = parseInt(goalInput.value);
@@ -651,17 +662,8 @@
             progressBar.style.width = `${Math.min(progress, 100)}%`;
         }
 
-        function resetReps() {
-            reps = 0;
-            stage = 'start';
-            startTime = null;
-            document.getElementById('reps').textContent = 'Reps: 0';
-            timerDisplay.textContent = 'Time: 0s';
-            rpmDisplay.textContent = 'RPM: 0';
-            updateProgressBar();
-        }
 
-        let startTime = null;
+
         const timerDisplay = document.getElementById('timer');
         const rpmDisplay = document.getElementById('rpm');
 
@@ -690,6 +692,7 @@
         });
 
         async function detect() {
+            console.log('detect: start');
             const poses = await detector.estimatePoses(video);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -748,6 +751,7 @@
                     }
                 }
             }
+            console.log('detect: end');
             if (window.poseDetectionActive) {
                 requestAnimationFrame(detect);
             }
@@ -757,23 +761,25 @@
         loader.style.display = 'none';
 
         window.poseDetectionActive = true;
+        console.log('main: starting detection');
         detect();
     }
 
 
-    let reps = 0;
-    let stage = null; // 'up' or 'down'
-    let startTime = null;
+
 
     function resetReps() {
         reps = 0;
-        stage = null;
+        stage = 'start';
         startTime = null;
         document.getElementById('reps').textContent = 'Reps: 0';
-        document.getElementById('timer').textContent = 'Time: 0s';
-        document.getElementById('rpm').textContent = 'RPM: 0';
-        if (document.getElementById('progress-bar')) {
-            document.getElementById('progress-bar').style.width = '0%';
+        const timerDisplay = document.getElementById('timer');
+        const rpmDisplay = document.getElementById('rpm');
+        if(timerDisplay) timerDisplay.textContent = 'Time: 0s';
+        if(rpmDisplay) rpmDisplay.textContent = 'RPM: 0';
+        const progressBar = document.getElementById('progress-bar');
+        if (progressBar) {
+            progressBar.style.width = '0%';
         }
     }
 
