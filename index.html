@@ -448,6 +448,7 @@
       <div id="timer" style="display: none;">Time: 0s</div>
       <div id="rpm" style="display: none;">RPM: 0</div>
       <button id="save-button" class="control-button">Save</button>
+      <button id="reset-button" class="control-button">Reset</button>
     </div>
     <div id="goal-container">
       <div id="goal-controls">
@@ -486,7 +487,6 @@
     <canvas id="canvas"></canvas>
     <div id="controls-container">
       <button id="focus-mode-button" class="control-button">Focus Mode</button>
-      <button id="reset-button" class="control-button">Reset</button>
     </div>
     <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
       Requesting camera access...
@@ -625,15 +625,15 @@
             this.maxHistoryLength = 10;
             
             // Lacrosse ball specific parameters (regulation ball is 2.5 inches diameter)
-            this.minBallRadius = 20;  // Minimum radius for lacrosse ball detection
-            this.maxBallRadius = 40;  // Maximum radius for lacrosse ball detection
+            this.minBallRadius = 15;  // Minimum radius for lacrosse ball detection (reduced for better detection)
+            this.maxBallRadius = 50;  // Maximum radius for lacrosse ball detection (increased range)
             this.idealBallRadius = 30; // Ideal lacrosse ball radius in pixels
-            this.movementThreshold = 25; // Minimum movement to consider as significant
-            this.maxTrackingDistance = 120; // Maximum distance to track same ball
+            this.movementThreshold = 15; // Minimum movement to consider as significant (reduced for more sensitivity)
+            this.maxTrackingDistance = 150; // Maximum distance to track same ball (increased)
             
-            // Detection quality thresholds
-            this.minDetectionScore = 0.4; // Minimum score to accept a detection
-            this.colorMatchThreshold = 0.3; // Minimum color match percentage
+            // Detection quality thresholds (more lenient for better responsiveness)
+            this.minDetectionScore = 0.25; // Minimum score to accept a detection (reduced)
+            this.colorMatchThreshold = 0.2; // Minimum color match percentage (reduced)
             
             // Lacrosse ball color ranges in HSV
             this.colorRanges = {
@@ -715,9 +715,9 @@
                     circles,
                     cv.HOUGH_GRADIENT,
                     1,              // dp: inverse ratio of accumulator resolution
-                    100,            // minDist: minimum distance between circle centers
-                    120,            // param1: upper threshold for edge detection (increased)
-                    40,             // param2: accumulator threshold for center detection (increased for precision)
+                    80,             // minDist: minimum distance between circle centers (reduced)
+                    100,            // param1: upper threshold for edge detection (reduced for more sensitivity)
+                    30,             // param2: accumulator threshold for center detection (reduced for more detections)
                     this.minBallRadius,  // minRadius
                     this.maxBallRadius   // maxRadius
                 );
@@ -1015,7 +1015,7 @@
             
             const avgMovement = totalMovement / (recent.length - 1);
             const isSignificantMovement = avgMovement > this.movementThreshold;
-            const isVerticalMovement = verticalMovement > totalMovement * 0.6;
+            const isVerticalMovement = verticalMovement > totalMovement * 0.4; // Reduced threshold for more sensitivity
             
             return {
                 isThrow: isSignificantMovement && isVerticalMovement,
@@ -1115,9 +1115,9 @@
         let repState = 'waiting'; // 'waiting', 'ball_present', 'ball_away', 'ball_returned'
         let lastThrowTime = 0;
         let ballAbsentTime = 0;
-        const minTimeBetweenThrows = 800; // Minimum 800ms between throws
-        const minAbsentTime = 300; // Ball must be absent for at least 300ms
-        const ballAbsentThreshold = 3; // Number of consecutive frames without ball
+        const minTimeBetweenThrows = 500; // Minimum 500ms between throws (reduced for more responsiveness)
+        const minAbsentTime = 200; // Ball must be absent for at least 200ms (reduced)
+        const ballAbsentThreshold = 2; // Number of consecutive frames without ball (reduced)
         let consecutiveAbsentFrames = 0;
 
         async function detect() {
@@ -1253,7 +1253,9 @@
     });
 
     document.getElementById('reset-button').addEventListener('click', () => {
-        resetReps();
+        if (confirm('Are you sure you want to reset? This will clear all current progress.')) {
+            resetReps();
+        }
     });
 
     document.getElementById('menu-icon').addEventListener('click', function() {
