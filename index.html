@@ -74,19 +74,7 @@
       margin-top: 1.5rem;
     }
 
-    #view-toggle {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        padding: 0.5rem 1rem;
-        font-size: 0.9rem;
-        background-image: linear-gradient(to right, #2196F3, #1976D2);
-    }
 
-    #view-toggle:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    }
 
     .focus-view h1,
     .focus-view p,
@@ -333,11 +321,11 @@
           <button id="login-button" class="control-button">Login/Sign Up</button>
           <button id="leaderboard-button" class="control-button">Leaderboard</button>
           <button id="session-history-button" class="control-button">History</button>
+          <button id="view-toggle" class="control-button">Show Dots</button>
         </div>
     </div>
     <canvas id="canvas"></canvas>
     <div id="controls-container">
-      <button id="view-toggle">Show Dots</button>
       <button id="focus-mode-button" class="control-button">Focus Mode</button>
     </div>
     <div id="camera-status" style="display: none; margin: 1rem auto; padding: 1rem; background: rgba(0,0,0,0.7); border-radius: 5px; max-width: 400px;">
@@ -392,7 +380,8 @@
                 video: {
                     width: { ideal: 1280 },
                     height: { ideal: 720 },
-                    facingMode: 'user'
+                    facingMode: 'user',
+                    frameRate: { ideal: 60 }
                 }
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out')), 10000))
