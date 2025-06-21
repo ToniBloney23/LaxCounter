@@ -264,6 +264,14 @@
         font-size: 2rem;
         cursor: pointer;
     }
+    #version-counter {
+        position: fixed;
+        bottom: 5px;
+        right: 10px;
+        font-size: 0.8rem;
+        color: #555;
+        z-index: 5000;
+    }
   </style>
 </head>
 <body>
@@ -339,7 +347,7 @@
     let timerInterval;
     let seconds = 0;
     let lastRepTime = 0;
-    const repCooldown = 500; // 500ms cooldown between reps
+    const repCooldown = 250; // 250ms cooldown between reps
 
     class LacrosseBallTracker {
         constructor() {
@@ -554,6 +562,6 @@
         script.onload = onOpenCvReady;
     }
   </script>
-  <div style="position: fixed; bottom: 5px; right: 10px; font-size: 0.8rem; color: #555;">v0.01</div>
+  <div id="version-counter">v0.01</div>
 </body>
 </html>
