@@ -347,7 +347,7 @@
     let timerInterval;
     let seconds = 0;
     let lastRepTime = 0;
-    const repCooldown = 350; // 350ms cooldown between reps
+    const repCooldown = 300; // 300ms cooldown between reps
 
     class LacrosseBallTracker {
         constructor() {
@@ -358,7 +358,7 @@
             this.maxBallRadius = 50;
             this.framesSinceBallSeen = 0;
             this.framesWithBall = 0;
-            this.detectionThreshold = 4; // needs 4 consecutive frames to change state
+            this.detectionThreshold = 3; // needs 3 consecutive frames to change state
         }
 
         detect(context, videoElement) {
@@ -372,7 +372,7 @@
             cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
             cv.GaussianBlur(gray, gray, new cv.Size(9, 9), 2, 2);
 
-            cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, 45, 75, 42, this.minBallRadius, this.maxBallRadius);
+            cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, 45, 70, 38, this.minBallRadius, this.maxBallRadius);
 
             const ballDetectedThisFrame = circles.cols > 0;
 
@@ -405,7 +405,8 @@
                 this.ballState = 'ball_away';
                 this.lastThrowTime = currentTime;
             } else if (this.ballState === 'ball_away' && this.framesWithBall > this.detectionThreshold) {
-                if (currentTime - this.lastThrowTime > 300 && currentTime - lastRepTime > repCooldown) { // Debounce and Cooldown
+                const flightTime = currentTime - this.lastThrowTime;
+                if (flightTime > 250 && flightTime < 4000 && currentTime - lastRepTime > repCooldown) { // Debounce, Cooldown, and Flight Time Window
                     reps++;
                     repsDisplay.textContent = `Reps: ${reps}`;
                     repSound.play();
@@ -413,7 +414,7 @@
                     repTimestamps.push(currentTime);
                     lastRepTime = currentTime;
                 }
-            } else if (this.ballState === 'ball_away' && this.framesSinceBallSeen > 150) { // ~5 seconds at 30fps
+            } else if (this.ballState === 'ball_away' && this.framesSinceBallSeen > 200) { // ~6.6 seconds at 30fps
                 this.ballState = 'waiting';
             }
 
@@ -568,6 +569,6 @@
         script.onload = onOpenCvReady;
     }
   </script>
-  <div id="version-counter">v0.04</div>
+  <div id="version-counter">v0.07</div>
 </body>
 </html>
