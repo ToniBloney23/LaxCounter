@@ -347,15 +347,18 @@
     let timerInterval;
     let seconds = 0;
     let lastRepTime = 0;
-    const repCooldown = 250; // 250ms cooldown between reps
+    const repCooldown = 350; // 350ms cooldown between reps
 
     class LacrosseBallTracker {
         constructor() {
-            this.ballState = 'waiting'; // waiting, ball_away, ball_returned
+            this.ballState = 'waiting'; // waiting, ball_present, ball_away
             this.lastThrowTime = 0;
             this.minTimeBetweenThrows = 1000; // 1 second
             this.minBallRadius = 10;
             this.maxBallRadius = 50;
+            this.framesSinceBallSeen = 0;
+            this.framesWithBall = 0;
+            this.detectionThreshold = 4; // needs 4 consecutive frames to change state
         }
 
         detect(context, videoElement) {
@@ -369,34 +372,39 @@
             cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
             cv.GaussianBlur(gray, gray, new cv.Size(9, 9), 2, 2);
 
-            cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, 45, 75, 40, this.minBallRadius, this.maxBallRadius);
+            cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, 45, 75, 42, this.minBallRadius, this.maxBallRadius);
 
-            let ballDetected = false;
-            if (showDetection) {
-              for (let i = 0; i < circles.cols; ++i) {
-                let x = circles.data32F[i * 3];
-                let y = circles.data32F[i * 3 + 1];
-                let radius = circles.data32F[i * 3 + 2];
-                let point = new cv.Point(x, y);
-                context.strokeStyle = '#00FF00';
-                context.lineWidth = 2;
-                context.beginPath();
-                context.arc(x, y, radius, 0, 2 * Math.PI);
-                  context.stroke();
-                  ballDetected = true;
-              }
-            } else {
-                ballDetected = circles.cols > 0;
+            const ballDetectedThisFrame = circles.cols > 0;
+
+            if (showDetection && ballDetectedThisFrame) {
+                for (let i = 0; i < circles.cols; ++i) {
+                    let x = circles.data32F[i * 3];
+                    let y = circles.data32F[i * 3 + 1];
+                    let radius = circles.data32F[i * 3 + 2];
+                    context.strokeStyle = '#00FF00';
+                    context.lineWidth = 2;
+                    context.beginPath();
+                    context.arc(x, y, radius, 0, 2 * Math.PI);
+                    context.stroke();
+                }
             }
 
             const currentTime = Date.now();
 
-            if (this.ballState === 'waiting' && ballDetected) {
+            if (ballDetectedThisFrame) {
+                this.framesWithBall++;
+                this.framesSinceBallSeen = 0;
+            } else {
+                this.framesWithBall = 0;
+                this.framesSinceBallSeen++;
+            }
+
+            if (this.ballState === 'waiting' && this.framesWithBall > this.detectionThreshold) {
                 this.ballState = 'ball_present';
-            } else if (this.ballState === 'ball_present' && !ballDetected) {
+            } else if (this.ballState === 'ball_present' && this.framesSinceBallSeen > this.detectionThreshold) {
                 this.ballState = 'ball_away';
                 this.lastThrowTime = currentTime;
-            } else if (this.ballState === 'ball_away' && ballDetected) {
+            } else if (this.ballState === 'ball_away' && this.framesWithBall > this.detectionThreshold) {
                 if (currentTime - this.lastThrowTime > 300 && currentTime - lastRepTime > repCooldown) { // Debounce and Cooldown
                     reps++;
                     repsDisplay.textContent = `Reps: ${reps}`;
@@ -405,10 +413,8 @@
                     repTimestamps.push(currentTime);
                     lastRepTime = currentTime;
                 }
-            } else if (this.ballState === 'ball_away' && !ballDetected) {
-                if (currentTime - this.lastThrowTime > 5000) { // Reset if ball is gone for too long
-                    this.ballState = 'waiting';
-                }
+            } else if (this.ballState === 'ball_away' && this.framesSinceBallSeen > 150) { // ~5 seconds at 30fps
+                this.ballState = 'waiting';
             }
 
             src.delete();
@@ -562,6 +568,6 @@
         script.onload = onOpenCvReady;
     }
   </script>
-  <div id="version-counter">v0.02</div>
+  <div id="version-counter">v0.04</div>
 </body>
 </html>
