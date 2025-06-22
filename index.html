@@ -1576,9 +1576,236 @@
       }
     }
 
+    // PoseDetector Class for shoulder and arm tracking
+    class PoseDetector {
+      constructor() {
+        this.previousShoulderY = null;
+        this.lowestShoulderY = null;
+        this.highestShoulderY = null;
+        this.rangeOfMotionThreshold = 0.65; // 65% range of motion required for a rep
+        this.movementState = 'idle'; // idle, up, down
+        this.lastStateChange = 0;
+        this.movementThreshold = 10;
+        this.shoulderX = 0;
+        this.shoulderY = 0;
+        this.armX = 0;
+        this.armY = 0;
+        this.calibrated = false;
+      }
+
+      setSensitivity(value) {
+        // Adjust sensitivity parameters
+        this.movementThreshold = 15 - (value * 1); // Higher sensitivity = lower threshold
+        this.rangeOfMotionThreshold = Math.max(0.5, 0.8 - (value * 0.03)); // Higher sensitivity = lower ROM requirement
+      }
+
+      detect(context, videoElement) {
+        if (typeof cv === 'undefined') return false;
+
+        // Draw current frame to canvas
+        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        
+        // Simulate shoulder and arm tracking with color detection
+        // In a real implementation, this would use a pose estimation model
+        let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+        let hsv = new cv.Mat();
+        let mask = new cv.Mat();
+        let contours = new cv.MatVector();
+        let hierarchy = new cv.Mat();
+        
+        // Get frame data for OpenCV processing
+        src.data.set(context.getImageData(0, 0, canvas.width, canvas.height).data);
+        
+        // Convert to HSV color space for better color detection
+        cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+        cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+        
+        // Define range for skin color in HSV (simplified)
+        let lowerBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 20, 70, 0]);
+        let upperBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [20, 150, 255, 255]);
+        
+        // Threshold the HSV image to get only skin colors
+        cv.inRange(hsv, lowerBound, upperBound, mask);
+        
+        // Find contours
+        cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        
+        // Find the two largest contours (shoulder and arm)
+        let areas = [];
+        for (let i = 0; i < contours.size(); ++i) {
+          let contour = contours.get(i);
+          let area = cv.contourArea(contour);
+          if (area > 500) { // Minimum area threshold
+            areas.push({index: i, area: area});
+          }
+        }
+        
+        // Sort by area (descending)
+        areas.sort((a, b) => b.area - a.area);
+        
+        let repDetected = false;
+        const now = Date.now();
+        
+        // If we found at least one contour (ideally two for shoulder and arm)
+        if (areas.length > 0) {
+          // Use the largest contour as the shoulder
+          let shoulderContour = contours.get(areas[0].index);
+          let shoulderRect = cv.boundingRect(shoulderContour);
+          
+          this.shoulderX = shoulderRect.x + (shoulderRect.width / 2);
+          this.shoulderY = shoulderRect.y + (shoulderRect.height / 2);
+          
+          // If we have a second contour, use it as the arm
+          if (areas.length > 1) {
+            let armContour = contours.get(areas[1].index);
+            let armRect = cv.boundingRect(armContour);
+            
+            this.armX = armRect.x + (armRect.width / 2);
+            this.armY = armRect.y + (armRect.height / 2);
+          }
+          
+          // Draw tracking points if detection overlay is enabled
+          if (showDetection) {
+            // Draw shoulder point
+            context.fillStyle = '#4cc9f0';
+            context.beginPath();
+            context.arc(this.shoulderX, this.shoulderY, 8, 0, 2 * Math.PI);
+            context.fill();
+            context.fillText('Shoulder', this.shoulderX + 15, this.shoulderY);
+            
+            // Draw arm point if detected
+            if (areas.length > 1) {
+              context.fillStyle = '#e71d36';
+              context.beginPath();
+              context.arc(this.armX, this.armY, 8, 0, 2 * Math.PI);
+              context.fill();
+              context.fillText('Arm', this.armX + 15, this.armY);
+              
+              // Draw line connecting shoulder and arm
+              context.strokeStyle = '#ffffff';
+              context.lineWidth = 2;
+              context.beginPath();
+              context.moveTo(this.shoulderX, this.shoulderY);
+              context.lineTo(this.armX, this.armY);
+              context.stroke();
+            }
+          }
+          
+          // Track vertical movement of shoulder for rep counting
+          if (this.previousShoulderY !== null) {
+            // Initialize calibration values if not set
+            if (!this.calibrated) {
+              this.lowestShoulderY = this.shoulderY;
+              this.highestShoulderY = this.shoulderY;
+              this.calibrated = true;
+            }
+            
+            // Update range of motion boundaries
+            if (this.shoulderY < this.highestShoulderY) {
+              this.highestShoulderY = this.shoulderY; // Higher position (lower Y value)
+            }
+            if (this.shoulderY > this.lowestShoulderY) {
+              this.lowestShoulderY = this.shoulderY; // Lower position (higher Y value)
+            }
+            
+            // Calculate total range of motion
+            const totalRange = this.lowestShoulderY - this.highestShoulderY;
+            
+            // Calculate current position as percentage of range
+            let currentPosition = 0;
+            if (totalRange > 0) {
+              currentPosition = (this.lowestShoulderY - this.shoulderY) / totalRange;
+            }
+            
+            // State machine for rep detection with range of motion threshold
+            const deltaY = this.shoulderY - this.previousShoulderY;
+            
+            if (deltaY < -this.movementThreshold && this.movementState !== 'up') {
+              // Moving up
+              this.movementState = 'up';
+              this.lastStateChange = now;
+            } else if (deltaY > this.movementThreshold && this.movementState === 'up' && 
+                      (now - this.lastStateChange) > minRepDuration) {
+              // Moving down after being up
+              // Only count as rep if range of motion threshold was met
+              if (currentPosition >= this.rangeOfMotionThreshold) {
+                this.movementState = 'down';
+                this.lastStateChange = now;
+                repDetected = true;
+              }
+            } else if (Math.abs(deltaY) < this.movementThreshold && this.movementState === 'down' && 
+                      (now - this.lastStateChange) > 300) {
+              // Back to idle
+              this.movementState = 'idle';
+            }
+            
+            // Draw ROM indicator if detection overlay is enabled
+            if (showDetection) {
+              // Draw range of motion percentage
+              context.font = '16px Montserrat';
+              context.fillStyle = 'white';
+              context.fillText(`ROM: ${Math.round(currentPosition * 100)}%`, 40, 75);
+              context.fillText(`Threshold: ${Math.round(this.rangeOfMotionThreshold * 100)}%`, 40, 100);
+              
+              // Draw ROM bar
+              const barWidth = 150;
+              const barHeight = 15;
+              const barX = 40;
+              const barY = 110;
+              
+              // Background bar
+              context.fillStyle = 'rgba(255, 255, 255, 0.2)';
+              context.fillRect(barX, barY, barWidth, barHeight);
+              
+              // Current ROM bar
+              context.fillStyle = currentPosition >= this.rangeOfMotionThreshold ? 
+                                'rgba(46, 196, 182, 0.8)' : 'rgba(231, 29, 54, 0.8)';
+              context.fillRect(barX, barY, barWidth * currentPosition, barHeight);
+              
+              // Threshold marker
+              context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+              context.fillRect(barX + (barWidth * this.rangeOfMotionThreshold) - 1, barY - 5, 2, barHeight + 10);
+            }
+          }
+          
+          this.previousShoulderY = this.shoulderY;
+        } else {
+          this.previousShoulderY = null;
+        }
+        
+        // Draw movement state indicator if detection overlay is enabled
+        if (showDetection) {
+          context.fillStyle = this.movementState === 'idle' ? 'rgba(46, 196, 182, 0.5)' : 
+                             this.movementState === 'up' ? 'rgba(231, 29, 54, 0.5)' : 
+                             'rgba(255, 159, 28, 0.5)';
+          context.fillRect(10, 10, 20, 20);
+          
+          // Add text label
+          context.font = '16px Montserrat';
+          context.fillStyle = 'white';
+          context.fillText(`State: ${this.movementState}`, 40, 25);
+          if (this.previousShoulderY !== null) {
+            context.fillText(`Y-Pos: ${Math.round(this.shoulderY)}`, 40, 50);
+          }
+        }
+        
+        // Clean up OpenCV resources
+        src.delete();
+        hsv.delete();
+        mask.delete();
+        contours.delete();
+        hierarchy.delete();
+        lowerBound.delete();
+        upperBound.delete();
+        
+        return repDetected;
+      }
+    }
+
     // Initialize detectors
     const motionDetector = new MotionDetector();
     const colorTracker = new ColorTracker();
+    const poseDetector = new PoseDetector();
     let activeDetector = motionDetector;
 
     // Setup camera
@@ -1754,7 +1981,9 @@
           case 'color':
             activeDetector = colorTracker;
             break;
-          // Add more detector types as needed
+          case 'pose':
+            activeDetector = poseDetector;
+            break;
         }
       });
       
