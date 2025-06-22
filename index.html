@@ -476,8 +476,12 @@
         await setupCamera();
         const tracker = new ArmSleeveTracker();
 
+        let frameCount = 0;
         function gameLoop() {
-            tracker.detect(ctx, video);
+            frameCount++;
+            if (frameCount % 4 === 0) { // Process every 4th frame
+                tracker.detect(ctx, video);
+            }
             requestAnimationFrame(gameLoop);
         }
 
@@ -609,6 +613,6 @@
         script.onload = onOpenCvReady;
     }
   </script>
-  <div id="version-counter">v0.09</div>
+  <div id="version-counter">v0.10</div>
 </body>
 </html>
