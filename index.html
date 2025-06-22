@@ -295,7 +295,7 @@
         <div class="menu-item" id="account-label">Account</div>
         <div class="menu-item" id="history-label">History</div>
         <div class="menu-item">
-            <label for="toggle-detection">Show Ball Detection</label>
+            <label for="toggle-detection">Show Sleeve Detection</label>
             <label class="toggle-label">
                 <input type="checkbox" id="toggle-detection">
                 <span class="toggle-switch"></span>
@@ -349,78 +349,86 @@
     let lastRepTime = 0;
     const repCooldown = 300; // 300ms cooldown between reps
 
-    class LacrosseBallTracker {
+    class ArmSleeveTracker {
         constructor() {
-            this.ballState = 'waiting'; // waiting, ball_present, ball_away
-            this.lastThrowTime = 0;
-            this.minTimeBetweenThrows = 1000; // 1 second
-            this.minBallRadius = 10;
-            this.maxBallRadius = 50;
-            this.framesSinceBallSeen = 0;
-            this.framesWithBall = 0;
-            this.detectionThreshold = 3; // needs 3 consecutive frames to change state
+            this.sleeveState = 'down'; // down, up
+            this.lastSleeveCenterY = null;
+            this.minContourArea = 2000; // Minimum area to be considered a sleeve
         }
 
         detect(context, videoElement) {
             let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
-            let gray = new cv.Mat();
-            let circles = new cv.Mat();
+            let hsv = new cv.Mat();
+            let mask = new cv.Mat();
+            let contours = new cv.MatVector();
+            let hierarchy = new cv.Mat();
 
             context.drawImage(videoElement, 0, 0, videoElement.width, videoElement.height);
             src.data.set(context.getImageData(0, 0, videoElement.width, videoElement.height).data);
 
-            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-            cv.GaussianBlur(gray, gray, new cv.Size(9, 9), 2, 2);
+            cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+            cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
 
-            cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, 45, 70, 38, this.minBallRadius, this.maxBallRadius);
+            // Define range for white color in HSV
+            // This might need tuning based on lighting conditions
+            let lowerWhite = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 0, 180, 0]);
+            let upperWhite = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [180, 40, 255, 255]);
+            cv.inRange(hsv, lowerWhite, upperWhite, mask);
 
-            const ballDetectedThisFrame = circles.cols > 0;
+            cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-            if (showDetection && ballDetectedThisFrame) {
-                for (let i = 0; i < circles.cols; ++i) {
-                    let x = circles.data32F[i * 3];
-                    let y = circles.data32F[i * 3 + 1];
-                    let radius = circles.data32F[i * 3 + 2];
-                    context.strokeStyle = '#00FF00';
-                    context.lineWidth = 2;
-                    context.beginPath();
-                    context.arc(x, y, radius, 0, 2 * Math.PI);
-                    context.stroke();
+            let largestContour = null;
+            let maxArea = 0;
+            for (let i = 0; i < contours.size(); ++i) {
+                let cnt = contours.get(i);
+                let area = cv.contourArea(cnt, false);
+                if (area > maxArea) {
+                    maxArea = area;
+                    largestContour = cnt;
                 }
             }
 
             const currentTime = Date.now();
 
-            if (ballDetectedThisFrame) {
-                this.framesWithBall++;
-                this.framesSinceBallSeen = 0;
-            } else {
-                this.framesWithBall = 0;
-                this.framesSinceBallSeen++;
-            }
-
-            if (this.ballState === 'waiting' && this.framesWithBall > this.detectionThreshold) {
-                this.ballState = 'ball_present';
-            } else if (this.ballState === 'ball_present' && this.framesSinceBallSeen > this.detectionThreshold) {
-                this.ballState = 'ball_away';
-                this.lastThrowTime = currentTime;
-            } else if (this.ballState === 'ball_away' && this.framesWithBall > this.detectionThreshold) {
-                const flightTime = currentTime - this.lastThrowTime;
-                if (flightTime > 250 && flightTime < 4000 && currentTime - lastRepTime > repCooldown) { // Debounce, Cooldown, and Flight Time Window
-                    reps++;
-                    repsDisplay.textContent = `Reps: ${reps}`;
-                    repSound.play();
-                    this.ballState = 'ball_present';
-                    repTimestamps.push(currentTime);
-                    lastRepTime = currentTime;
+            if (largestContour && maxArea > this.minContourArea) {
+                if (showDetection) {
+                    let rect = cv.boundingRect(largestContour);
+                    context.strokeStyle = '#00FF00';
+                    context.lineWidth = 2;
+                    context.strokeRect(rect.x, rect.y, rect.width, rect.height);
                 }
-            } else if (this.ballState === 'ball_away' && this.framesSinceBallSeen > 200) { // ~6.6 seconds at 30fps
-                this.ballState = 'waiting';
+
+                const M = cv.moments(largestContour);
+                const sleeveCenterY = M.m01 / M.m00;
+
+                // Rep counting logic based on vertical movement
+                if (this.lastSleeveCenterY !== null) {
+                    // Arm is moving up
+                    if (sleeveCenterY < this.lastSleeveCenterY - 5 && this.sleeveState === 'down') { 
+                        this.sleeveState = 'up';
+                    }
+                    // Arm is moving down after being up, count as a rep
+                    else if (sleeveCenterY > this.lastSleeveCenterY + 5 && this.sleeveState === 'up') {
+                        if (currentTime - lastRepTime > repCooldown) { // Cooldown
+                            reps++;
+                            repsDisplay.textContent = `Reps: ${reps}`;
+                            repSound.play();
+                            lastRepTime = currentTime;
+                            repTimestamps.push(currentTime);
+                        }
+                        this.sleeveState = 'down';
+                    }
+                }
+                this.lastSleeveCenterY = sleeveCenterY;
+            } else {
+                this.lastSleeveCenterY = null; // Reset if sleeve is not detected
             }
 
             src.delete();
-            gray.delete();
-            circles.delete();
+            hsv.delete();
+            mask.delete();
+            contours.delete();
+            hierarchy.delete();
         }
     }
 
@@ -445,7 +453,7 @@
 
     async function main() {
         await setupCamera();
-        const tracker = new LacrosseBallTracker();
+        const tracker = new ArmSleeveTracker();
 
         function gameLoop() {
             tracker.detect(ctx, video);
@@ -480,7 +488,7 @@
             reps = 0;
             repTimestamps = [];
             repsDisplay.textContent = 'Reps: 0';
-            tracker.ballState = 'waiting';
+            tracker.sleeveState = 'down';
             resetTimer();
             startTimer();
         });
@@ -569,6 +577,6 @@
         script.onload = onOpenCvReady;
     }
   </script>
-  <div id="version-counter">v0.07</div>
+  <div id="version-counter">v0.08</div>
 </body>
 </html>
