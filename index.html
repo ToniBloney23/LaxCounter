@@ -1,6 +1,1850 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motion Rep Counter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://docs.opencv.org/4.9.0/opencv.js" async></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #4361ee;
+      --secondary: #3a0ca3;
+      --accent: #4cc9f0;
+      --success: #2ec4b6;
+      --warning: #ff9f1c;
+      --danger: #e71d36;
+      --dark: #1a1a2e;
+      --light: #f8f9fa;
+      --gray: #6c757d;
+      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background-color: var(--dark);
+      color: var(--light);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .app-container {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* Sidebar Styles */
+    .sidebar {
+      background-color: rgba(26, 26, 46, 0.95);
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      transition: var(--transition);
+    }
+
+    .sidebar-collapsed {
+      transform: translateX(-280px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      margin-bottom: 2.5rem;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+
+    .logo-text {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    .nav-section {
+      margin-bottom: 2rem;
+    }
+
+    .nav-section-title {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      color: var(--gray);
+      margin-bottom: 1rem;
+      padding-left: 0.5rem;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: var(--transition);
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .nav-item:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .nav-item.active {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .nav-icon {
+      margin-right: 0.75rem;
+      font-size: 1.2rem;
+      width: 1.5rem;
+      text-align: center;
+    }
+
+    .user-profile {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      padding: 1rem;
+      border-radius: 12px;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .user-avatar {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      background-color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-right: 0.75rem;
+    }
+
+    .user-info {
+      flex: 1;
+    }
+
+    .user-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .user-status {
+      font-size: 0.75rem;
+      color: var(--gray);
+    }
+
+    /* Main Content Styles */
+    .main-content {
+      padding: 2rem;
+      position: relative;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
+
+    .menu-toggle {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .menu-toggle:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(to right, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+      color: var(--gray);
+      font-size: 1rem;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--secondary);
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(67, 97, 238, 0.3);
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      color: var(--light);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-outline:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .btn-danger {
+      background-color: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background-color: #c41c2e;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(231, 29, 54, 0.3);
+    }
+
+    .btn-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      padding: 0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    /* Dashboard Grid */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background-color: rgba(26, 26, 46, 0.8);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+      transition: var(--transition);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--light);
+    }
+
+    .card-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .card-icon-primary {
+      background-color: rgba(67, 97, 238, 0.2);
+      color: var(--primary);
+    }
+
+    .card-icon-success {
+      background-color: rgba(46, 196, 182, 0.2);
+      color: var(--success);
+    }
+
+    .card-icon-warning {
+      background-color: rgba(255, 159, 28, 0.2);
+      color: var(--warning);
+    }
+
+    .card-icon-danger {
+      background-color: rgba(231, 29, 54, 0.2);
+      color: var(--danger);
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--gray);
+    }
+
+    .stat-change {
+      display: flex;
+      align-items: center;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+
+    .stat-change-positive {
+      color: var(--success);
+    }
+
+    .stat-change-negative {
+      color: var(--danger);
+    }
+
+    /* Video Container */
+    .video-container {
+      position: relative;
+      margin-bottom: 2rem;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    #video-canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      background-color: #000;
+    }
+
+    #video {
+      display: none;
+    }
+
+    .video-overlay {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      z-index: 10;
+    }
+
+    .video-controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .rep-counter {
+      font-size: 3rem;
+      font-weight: 700;
+      color: white;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .timer {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: white;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Charts */
+    .chart-container {
+      height: 300px;
+      margin-bottom: 1rem;
+    }
+
+    /* Settings Panel */
+    .settings-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 350px;
+      height: 100vh;
+      background-color: rgba(26, 26, 46, 0.95);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 2rem;
+      z-index: 1000;
+      transform: translateX(100%);
+      transition: var(--transition);
+      overflow-y: auto;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .settings-panel.open {
+      transform: translateX(0);
+    }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
+
+    .settings-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .close-settings {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .close-settings:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .settings-section {
+      margin-bottom: 2rem;
+    }
+
+    .settings-section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--light);
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+      color: var(--gray);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: var(--light);
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: var(--transition);
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+      background-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .form-select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236c757d' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      background-size: 16px 12px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.2);
+      transition: var(--transition);
+      border-radius: 34px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: var(--transition);
+      border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: var(--primary);
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(26px);
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-text {
+      font-size: 0.9rem;
+    }
+
+    .range-slider {
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .range-slider input {
+      width: 100%;
+      -webkit-appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+    }
+
+    .range-slider input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .range-slider input::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      transition: var(--transition);
+      border: none;
+    }
+
+    .range-slider input::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .range-slider input::-moz-range-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .range-values {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--gray);
+      margin-top: 0.5rem;
+    }
+
+    /* Workout History */
+    .history-list {
+      margin-top: 1rem;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      padding: 1rem;
+      border-radius: 12px;
+      background-color: rgba(255, 255, 255, 0.05);
+      margin-bottom: 1rem;
+      transition: var(--transition);
+    }
+
+    .history-item:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .history-icon {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 12px;
+      background-color: rgba(67, 97, 238, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      color: var(--primary);
+      margin-right: 1rem;
+    }
+
+    .history-details {
+      flex: 1;
+    }
+
+    .history-title {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .history-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: var(--gray);
+    }
+
+    .history-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .history-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    /* Loader */
+    #loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .loader-spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loader-text {
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: var(--light);
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+      .app-container {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 280px;
+        z-index: 1000;
+        transform: translateX(-100%);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .main-content {
+        padding: 1.5rem;
+      }
+
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .action-buttons {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .settings-panel {
+        width: 100%;
+      }
+
+      .stat-value {
+        font-size: 2rem;
+      }
+    }
+
+    /* Focus Mode */
+    .focus-mode .sidebar,
+    .focus-mode .header,
+    .focus-mode .dashboard-grid,
+    .focus-mode .settings-panel {
+      display: none;
+    }
+
+    .focus-mode .video-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      border-radius: 0;
+    }
+
+    .focus-mode #video-canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .focus-mode .rep-counter {
+      font-size: 6rem;
+    }
+
+    .focus-mode .timer {
+      font-size: 2.5rem;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    .slide-up {
+      animation: slideUp 0.5s ease forwards;
+    }
+
+    /* Version */
+    .version {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.3);
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loader -->
+  <div id="loader">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Loading OpenCV.js...</div>
+  </div>
+
+  <div class="app-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">RC</div>
+        <div class="logo-text">RepCounter</div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Main</div>
+        <div class="nav-item active" data-page="dashboard">
+          <div class="nav-icon">📊</div>
+          <div>Dashboard</div>
+        </div>
+        <div class="nav-item" data-page="workout">
+          <div class="nav-icon">🏋️</div>
+          <div>Workout</div>
+        </div>
+        <div class="nav-item" data-page="history">
+          <div class="nav-icon">📅</div>
+          <div>History</div>
+        </div>
+        <div class="nav-item" data-page="stats">
+          <div class="nav-icon">📈</div>
+          <div>Statistics</div>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Settings</div>
+        <div class="nav-item" id="open-settings">
+          <div class="nav-icon">⚙️</div>
+          <div>Preferences</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">❓</div>
+          <div>Help</div>
+        </div>
+      </div>
+
+      <div class="user-profile">
+        <div class="user-avatar">G</div>
+        <div class="user-info">
+          <div class="user-name">Guest User</div>
+          <div class="user-status">Free Plan</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="header">
+        <div>
+          <h1 class="page-title">Motion Rep Counter</h1>
+          <p class="page-subtitle">Track your workout reps with precision</p>
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-outline" id="toggle-focus-mode">
+            <span class="btn-icon">👁️</span>
+            <span>Focus Mode</span>
+          </button>
+          <button class="btn btn-primary" id="start-workout">
+            <span class="btn-icon">▶️</span>
+            <span>Start Workout</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Dashboard Grid -->
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Today's Reps</div>
+            <div class="card-icon card-icon-primary">🏋️</div>
+          </div>
+          <div class="stat-value" id="today-reps">0</div>
+          <div class="stat-label">Total repetitions</div>
+          <div class="stat-change stat-change-positive">
+            <span>↑</span>
+            <span>12% from yesterday</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Workout Time</div>
+            <div class="card-icon card-icon-success">⏱️</div>
+          </div>
+          <div class="stat-value" id="workout-time">0:00</div>
+          <div class="stat-label">Total time today</div>
+          <div class="stat-change stat-change-positive">
+            <span>↑</span>
+            <span>5% from average</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Weekly Goal</div>
+            <div class="card-icon card-icon-warning">🎯</div>
+          </div>
+          <div class="stat-value" id="weekly-goal">45%</div>
+          <div class="stat-label">Progress to goal</div>
+          <div class="stat-change">
+            <span>🔥</span>
+            <span>On track for this week</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video Container -->
+      <div class="video-container">
+        <canvas id="video-canvas"></canvas>
+        <video id="video" autoplay playsinline muted></video>
+        
+        <div class="video-overlay">
+          <button class="btn btn-outline btn-icon" id="toggle-detection">👁️</button>
+          <button class="btn btn-danger btn-icon" id="reset-counter">🔄</button>
+        </div>
+        
+        <div class="video-controls">
+          <div class="rep-counter" id="rep-counter">0 reps</div>
+          <div class="timer" id="workout-timer">00:00</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Workout Progress</div>
+        </div>
+        <div class="chart-container">
+          <canvas id="progress-chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-header">
+      <div class="settings-title">Settings</div>
+      <div class="close-settings" id="close-settings">✕</div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Detection Settings</div>
+      
+      <div class="form-group">
+        <label class="form-label">Detection Type</label>
+        <select class="form-control form-select" id="detection-type">
+          <option value="motion">Motion Detection</option>
+          <option value="color">Color Tracking</option>
+          <option value="pose">Pose Estimation</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="toggle-label">
+          <span class="toggle-text">Show Detection Overlay</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="show-detection">
+            <span class="toggle-slider"></span>
+          </label>
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Detection Sensitivity</label>
+        <div class="range-slider">
+          <input type="range" min="1" max="10" value="5" id="sensitivity">
+          <div class="range-values">
+            <span>Low</span>
+            <span>High</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Minimum Rep Duration (ms)</label>
+        <input type="number" class="form-control" id="min-rep-duration" value="300">
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Workout Goals</div>
+      
+      <div class="form-group">
+        <label class="form-label">Daily Rep Goal</label>
+        <input type="number" class="form-control" id="daily-goal" value="100">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Weekly Rep Goal</label>
+        <input type="number" class="form-control" id="weekly-goal-input" value="500">
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">App Settings</div>
+      
+      <div class="form-group">
+        <label class="toggle-label">
+          <span class="toggle-text">Sound Effects</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="sound-effects" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label class="toggle-label">
+          <span class="toggle-text">Voice Announcements</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="voice-announcements">
+            <span class="toggle-slider"></span>
+          </label>
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label class="toggle-label">
+          <span class="toggle-text">Save Workout History</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="save-history" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </label>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" style="width: 100%;">Save Settings</button>
+  </div>
+
+  <div class="version">v1.0.0</div>
+
+  <!-- Audio Elements -->
+  <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg" preload="auto"></audio>
+  <audio id="milestone-sound" src="https://actions.google.com/sounds/v1/sports/crowd_cheer.ogg" preload="auto"></audio>
+
+  <script>
+    // DOM Elements
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('video-canvas');
+    const ctx = canvas.getContext('2d');
+    const repCounter = document.getElementById('rep-counter');
+    const workoutTimer = document.getElementById('workout-timer');
+    const todayReps = document.getElementById('today-reps');
+    const workoutTime = document.getElementById('workout-time');
+    const weeklyGoal = document.getElementById('weekly-goal');
+    const loader = document.getElementById('loader');
+    const repSound = document.getElementById('rep-sound');
+    const milestoneSound = document.getElementById('milestone-sound');
+    const toggleDetectionBtn = document.getElementById('toggle-detection');
+    const resetCounterBtn = document.getElementById('reset-counter');
+    const startWorkoutBtn = document.getElementById('start-workout');
+    const toggleFocusModeBtn = document.getElementById('toggle-focus-mode');
+    const settingsPanel = document.getElementById('settings-panel');
+    const openSettingsBtn = document.getElementById('open-settings');
+    const closeSettingsBtn = document.getElementById('close-settings');
+    const sidebar = document.querySelector('.sidebar');
+    const menuToggle = document.querySelector('.menu-toggle');
+
+    // State variables
+    let reps = 0;
+    let totalReps = 0;
+    let workoutActive = false;
+    let workoutStartTime = null;
+    let timerInterval = null;
+    let showDetection = false;
+    let detectionType = 'motion';
+    let sensitivity = 5;
+    let minRepDuration = 300;
+    let lastRepTime = 0;
+    let repHistory = [];
+    let workoutHistory = [];
+    let focusMode = false;
+
+    // Initialize charts
+    function initCharts() {
+      const ctx = document.getElementById('progress-chart').getContext('2d');
+      
+      // Sample data - would be replaced with actual user data
+      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const data = {
+        labels: labels,
+        datasets: [{
+          label: 'Daily Reps',
+          data: [65, 78, 52, 91, 43, 56, 0],
+          backgroundColor: 'rgba(67, 97, 238, 0.2)',
+          borderColor: 'rgba(67, 97, 238, 1)',
+          borderWidth: 2,
+          tension: 0.3,
+          fill: true
+        }]
+      };
+
+      const config = {
+        type: 'line',
+        data: data,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(26, 26, 46, 0.9)',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: false,
+              callbacks: {
+                label: function(context) {
+                  return `${context.parsed.y} reps`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false,
+                drawBorder: false
+              },
+              ticks: {
+                color: 'rgba(255, 255, 255, 0.7)'
+              }
+            },
+            y: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)',
+                drawBorder: false
+              },
+              ticks: {
+                color: 'rgba(255, 255, 255, 0.7)',
+                padding: 10
+              },
+              beginAtZero: true
+            }
+          }
+        }
+      };
+
+      new Chart(ctx, config);
+    }
+
+    // Motion Detector Class
+    class MotionDetector {
+      constructor() {
+        this.previousFrame = null;
+        this.motionThreshold = 30; // Default threshold
+        this.minMotionPixels = 1000; // Minimum number of pixels that need to change
+        this.motionState = 'idle'; // idle, moving, cooldown
+        this.lastStateChange = 0;
+        this.cooldownPeriod = 300; // ms
+        this.consecutiveFrames = 0;
+        this.requiredFrames = 3; // Number of consecutive frames needed to confirm motion
+      }
+
+      setSensitivity(value) {
+        // Scale 1-10 sensitivity to appropriate thresholds
+        this.motionThreshold = 50 - (value * 4); // Higher sensitivity = lower threshold
+        this.minMotionPixels = 2000 - (value * 150); // Higher sensitivity = fewer pixels needed
+        this.requiredFrames = Math.max(2, 5 - Math.floor(value / 2)); // Higher sensitivity = fewer frames needed
+      }
+
+      detect(context, videoElement) {
+        // Draw current frame to canvas
+        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        
+        // Get current frame data
+        const currentFrame = context.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // If we don't have a previous frame, store this one and return
+        if (!this.previousFrame) {
+          this.previousFrame = currentFrame;
+          return false;
+        }
+        
+        const currentData = currentFrame.data;
+        const previousData = this.previousFrame.data;
+        let motionPixels = 0;
+        
+        // Compare frames to detect motion
+        for (let i = 0; i < currentData.length; i += 4) {
+          // Calculate difference in RGB values
+          const rdiff = Math.abs(currentData[i] - previousData[i]);
+          const gdiff = Math.abs(currentData[i+1] - previousData[i+1]);
+          const bdiff = Math.abs(currentData[i+2] - previousData[i+2]);
+          
+          // If the difference is above threshold, count it as motion
+          if (rdiff > this.motionThreshold || gdiff > this.motionThreshold || bdiff > this.motionThreshold) {
+            motionPixels++;
+            
+            // Optionally highlight motion pixels if detection overlay is enabled
+            if (showDetection) {
+              // Calculate x, y from array index
+              const pixelIndex = i / 4;
+              const x = pixelIndex % canvas.width;
+              const y = Math.floor(pixelIndex / canvas.width);
+              
+              // Draw a small semi-transparent rectangle at motion point
+              context.fillStyle = 'rgba(76, 201, 240, 0.5)';
+              context.fillRect(x, y, 2, 2);
+            }
+          }
+        }
+        
+        // Store current frame as previous for next comparison
+        this.previousFrame = currentFrame;
+        
+        const now = Date.now();
+        let repDetected = false;
+        
+        // State machine for rep detection
+        if (motionPixels > this.minMotionPixels) {
+          // Motion detected
+          if (this.motionState === 'idle') {
+            this.consecutiveFrames++;
+            
+            if (this.consecutiveFrames >= this.requiredFrames) {
+              this.motionState = 'moving';
+              this.lastStateChange = now;
+              this.consecutiveFrames = 0;
+            }
+          }
+        } else {
+          // No motion detected
+          this.consecutiveFrames = 0;
+          
+          if (this.motionState === 'moving' && (now - this.lastStateChange) > minRepDuration) {
+            this.motionState = 'cooldown';
+            this.lastStateChange = now;
+            repDetected = true;
+          } else if (this.motionState === 'cooldown' && (now - this.lastStateChange) > this.cooldownPeriod) {
+            this.motionState = 'idle';
+          }
+        }
+        
+        // Draw motion state indicator if detection overlay is enabled
+        if (showDetection) {
+          context.fillStyle = this.motionState === 'idle' ? 'rgba(46, 196, 182, 0.5)' : 
+                             this.motionState === 'moving' ? 'rgba(231, 29, 54, 0.5)' : 
+                             'rgba(255, 159, 28, 0.5)';
+          context.fillRect(10, 10, 20, 20);
+          
+          // Add text label
+          context.font = '16px Montserrat';
+          context.fillStyle = 'white';
+          context.fillText(`Motion: ${motionPixels}`, 40, 25);
+          context.fillText(`State: ${this.motionState}`, 40, 50);
+        }
+        
+        return repDetected;
+      }
+    }
+
+    // Color Tracker Class
+    class ColorTracker {
+      constructor() {
+        this.targetHue = 0; // Default to red
+        this.hueRange = 20;
+        this.minSaturation = 50;
+        this.minValue = 50;
+        this.minContourArea = 1000;
+        this.trackedObject = { x: 0, y: 0, width: 0, height: 0, area: 0 };
+        this.previousY = null;
+        this.movementThreshold = 20;
+        this.movementState = 'idle'; // idle, up, down
+        this.lastStateChange = 0;
+      }
+
+      setSensitivity(value) {
+        this.hueRange = 10 + value;
+        this.minContourArea = 2000 - (value * 150);
+        this.movementThreshold = 30 - (value * 2);
+      }
+
+      detect(context, videoElement) {
+        if (typeof cv === 'undefined') return false;
+
+        let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+        let hsv = new cv.Mat();
+        let mask = new cv.Mat();
+        let contours = new cv.MatVector();
+        let hierarchy = new cv.Mat();
+
+        // Draw current frame to canvas
+        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        
+        // Get frame data for OpenCV processing
+        src.data.set(context.getImageData(0, 0, canvas.width, canvas.height).data);
+        
+        // Convert to HSV color space
+        cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+        cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+        
+        // Define range for target color in HSV
+        let lowerBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), 
+          [Math.max(0, this.targetHue - this.hueRange), this.minSaturation, this.minValue, 0]);
+        let upperBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), 
+          [Math.min(180, this.targetHue + this.hueRange), 255, 255, 255]);
+        
+        // Threshold the HSV image to get only target colors
+        cv.inRange(hsv, lowerBound, upperBound, mask);
+        
+        // Find contours
+        cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        
+        // Find the largest contour
+        let maxArea = 0;
+        let maxContourIndex = -1;
+        
+        for (let i = 0; i < contours.size(); ++i) {
+          let contour = contours.get(i);
+          let area = cv.contourArea(contour);
+          
+          if (area > maxArea && area > this.minContourArea) {
+            maxArea = area;
+            maxContourIndex = i;
+          }
+        }
+        
+        let repDetected = false;
+        const now = Date.now();
+        
+        // If we found a valid contour
+        if (maxContourIndex !== -1) {
+          let contour = contours.get(maxContourIndex);
+          let rect = cv.boundingRect(contour);
+          
+          this.trackedObject = {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            area: maxArea,
+            centerY: rect.y + (rect.height / 2)
+          };
+          
+          // Draw rectangle around the tracked object if detection overlay is enabled
+          if (showDetection) {
+            context.strokeStyle = '#4cc9f0';
+            context.lineWidth = 2;
+            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+            
+            // Draw center point
+            context.fillStyle = '#e71d36';
+            context.beginPath();
+            context.arc(rect.x + (rect.width / 2), rect.y + (rect.height / 2), 5, 0, 2 * Math.PI);
+            context.fill();
+          }
+          
+          // Track vertical movement for rep counting
+          if (this.previousY !== null) {
+            const deltaY = this.trackedObject.centerY - this.previousY;
+            
+            // State machine for rep detection
+            if (deltaY < -this.movementThreshold && this.movementState !== 'up') {
+              // Moving up
+              this.movementState = 'up';
+              this.lastStateChange = now;
+            } else if (deltaY > this.movementThreshold && this.movementState === 'up' && 
+                      (now - this.lastStateChange) > minRepDuration) {
+              // Moving down after being up
+              this.movementState = 'down';
+              this.lastStateChange = now;
+              repDetected = true;
+            } else if (Math.abs(deltaY) < this.movementThreshold && this.movementState === 'down' && 
+                      (now - this.lastStateChange) > 300) {
+              // Back to idle
+              this.movementState = 'idle';
+            }
+          }
+          
+          this.previousY = this.trackedObject.centerY;
+        } else {
+          this.previousY = null;
+        }
+        
+        // Draw movement state indicator if detection overlay is enabled
+        if (showDetection) {
+          context.fillStyle = this.movementState === 'idle' ? 'rgba(46, 196, 182, 0.5)' : 
+                             this.movementState === 'up' ? 'rgba(231, 29, 54, 0.5)' : 
+                             'rgba(255, 159, 28, 0.5)';
+          context.fillRect(10, 10, 20, 20);
+          
+          // Add text label
+          context.font = '16px Montserrat';
+          context.fillStyle = 'white';
+          context.fillText(`State: ${this.movementState}`, 40, 25);
+          if (this.previousY !== null) {
+            context.fillText(`Y-Pos: ${Math.round(this.trackedObject.centerY)}`, 40, 50);
+          }
+        }
+        
+        // Clean up OpenCV resources
+        src.delete();
+        hsv.delete();
+        mask.delete();
+        contours.delete();
+        hierarchy.delete();
+        lowerBound.delete();
+        upperBound.delete();
+        
+        return repDetected;
+      }
+    }
+
+    // Initialize detectors
+    const motionDetector = new MotionDetector();
+    const colorTracker = new ColorTracker();
+    let activeDetector = motionDetector;
+
+    // Setup camera
+    async function setupCamera() {
+      try {
+        const constraints = {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'user'
+          }
+        };
+        
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        
+        return new Promise((resolve) => {
+          video.onloadedmetadata = () => {
+            // Set canvas dimensions to match video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            resolve();
+          };
+        });
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        alert('Error accessing camera. Please make sure you have granted camera permissions.');
+      }
+    }
+
+    // Main detection loop
+    function detectionLoop() {
+      if (!video.paused && !video.ended) {
+        // Detect motion/color and check if a rep was completed
+        const repDetected = activeDetector.detect(ctx, video);
+        
+        if (repDetected && workoutActive && (Date.now() - lastRepTime) > minRepDuration) {
+          // Increment rep counter
+          reps++;
+          totalReps++;
+          lastRepTime = Date.now();
+          
+          // Update UI
+          repCounter.textContent = `${reps} reps`;
+          todayReps.textContent = totalReps;
+          
+          // Play sound
+          if (document.getElementById('sound-effects').checked) {
+            repSound.play().catch(e => console.log('Audio play error:', e));
+          }
+          
+          // Check for milestones
+          if (reps % 10 === 0) {
+            if (document.getElementById('sound-effects').checked) {
+              milestoneSound.play().catch(e => console.log('Audio play error:', e));
+            }
+            
+            // Voice announcement
+            if (document.getElementById('voice-announcements').checked) {
+              announceReps(reps);
+            }
+          }
+          
+          // Record rep timestamp
+          repHistory.push({
+            timestamp: Date.now(),
+            workout: workoutStartTime
+          });
+        }
+      }
+      
+      requestAnimationFrame(detectionLoop);
+    }
+
+    // Voice announcements
+    function announceReps(count) {
+      if ('speechSynthesis' in window) {
+        const announcement = new SpeechSynthesisUtterance(`${count} repetitions completed`);
+        window.speechSynthesis.speak(announcement);
+      }
+    }
+
+    // Timer functions
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      
+      timerInterval = setInterval(() => {
+        if (!workoutActive) return;
+        
+        const elapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        
+        workoutTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        workoutTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    function resetTimer() {
+      workoutTimer.textContent = '00:00';
+      workoutTime.textContent = '0:00';
+    }
+
+    // Event listeners
+    function setupEventListeners() {
+      // Toggle detection overlay
+      toggleDetectionBtn.addEventListener('click', () => {
+        showDetection = !showDetection;
+        toggleDetectionBtn.innerHTML = showDetection ? '👁️‍🗨️' : '👁️';
+      });
+      
+      // Reset counter
+      resetCounterBtn.addEventListener('click', () => {
+        reps = 0;
+        repCounter.textContent = '0 reps';
+      });
+      
+      // Start/stop workout
+      startWorkoutBtn.addEventListener('click', () => {
+        if (workoutActive) {
+          // Stop workout
+          workoutActive = false;
+          startWorkoutBtn.innerHTML = '<span class="btn-icon">▶️</span><span>Start Workout</span>';
+          
+          // Save workout to history if enabled
+          if (document.getElementById('save-history').checked && reps > 0) {
+            const workout = {
+              id: Date.now(),
+              date: new Date(),
+              duration: Math.floor((Date.now() - workoutStartTime) / 1000),
+              reps: reps,
+              type: detectionType
+            };
+            
+            workoutHistory.push(workout);
+            saveToLocalStorage();
+          }
+        } else {
+          // Start workout
+          workoutActive = true;
+          workoutStartTime = Date.now();
+          startWorkoutBtn.innerHTML = '<span class="btn-icon">⏹️</span><span>End Workout</span>';
+          reps = 0;
+          repCounter.textContent = '0 reps';
+          resetTimer();
+          startTimer();
+        }
+      });
+      
+      // Toggle focus mode
+      toggleFocusModeBtn.addEventListener('click', () => {
+        document.body.classList.toggle('focus-mode');
+        focusMode = document.body.classList.contains('focus-mode');
+      });
+      
+      // Settings panel
+      openSettingsBtn.addEventListener('click', () => {
+        settingsPanel.classList.add('open');
+      });
+      
+      closeSettingsBtn.addEventListener('click', () => {
+        settingsPanel.classList.remove('open');
+      });
+      
+      // Detection type change
+      document.getElementById('detection-type').addEventListener('change', (e) => {
+        detectionType = e.target.value;
+        
+        switch (detectionType) {
+          case 'motion':
+            activeDetector = motionDetector;
+            break;
+          case 'color':
+            activeDetector = colorTracker;
+            break;
+          // Add more detector types as needed
+        }
+      });
+      
+      // Sensitivity change
+      document.getElementById('sensitivity').addEventListener('input', (e) => {
+        sensitivity = parseInt(e.target.value);
+        motionDetector.setSensitivity(sensitivity);
+        colorTracker.setSensitivity(sensitivity);
+      });
+      
+      // Min rep duration change
+      document.getElementById('min-rep-duration').addEventListener('change', (e) => {
+        minRepDuration = parseInt(e.target.value);
+      });
+      
+      // Handle Safari audio unlock
+      document.addEventListener('click', unlockAudio, { once: true });
+      document.addEventListener('touchstart', unlockAudio, { once: true });
+      
+      // Navigation between pages
+      document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+        item.addEventListener('click', () => {
+          // Would implement page navigation in a full app
+          document.querySelectorAll('.nav-item').forEach(navItem => {
+            navItem.classList.remove('active');
+          });
+          item.classList.add('active');
+        });
+      });
+    }
+    
+    // Unlock audio for Safari
+    function unlockAudio() {
+      repSound.play().then(() => {
+        repSound.pause();
+        repSound.currentTime = 0;
+      }).catch(e => console.log('Audio unlock error:', e));
+      
+      milestoneSound.play().then(() => {
+        milestoneSound.pause();
+        milestoneSound.currentTime = 0;
+      }).catch(e => console.log('Audio unlock error:', e));
+    }
+    
+    // Local storage functions
+    function saveToLocalStorage() {
+      try {
+        localStorage.setItem('repCounter_history', JSON.stringify(workoutHistory));
+        localStorage.setItem('repCounter_totalReps', totalReps.toString());
+      } catch (e) {
+        console.error('Error saving to localStorage:', e);
+      }
+    }
+    
+    function loadFromLocalStorage() {
+      try {
+        const history = localStorage.getItem('repCounter_history');
+        if (history) {
+          workoutHistory = JSON.parse(history);
+        }
+        
+        const savedTotalReps = localStorage.getItem('repCounter_totalReps');
+        if (savedTotalReps) {
+          totalReps = parseInt(savedTotalReps);
+          todayReps.textContent = totalReps;
+        }
+      } catch (e) {
+        console.error('Error loading from localStorage:', e);
+      }
+    }
+    
+    // Frame skipping for performance optimization
+    let frameCount = 0;
+    function optimizedDetectionLoop() {
+      if (!video.paused && !video.ended) {
+        // Process every 2nd frame for better performance
+        frameCount++;
+        if (frameCount % 2 === 0) {
+          // Draw current frame
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          // Only run detection if workout is active
+          if (workoutActive) {
+            // Detect motion/color and check if a rep was completed
+            const repDetected = activeDetector.detect(ctx, video);
+            
+            if (repDetected && (Date.now() - lastRepTime) > minRepDuration) {
+              // Increment rep counter
+              reps++;
+              totalReps++;
+              lastRepTime = Date.now();
+              
+              // Update UI
+              repCounter.textContent = `${reps} reps`;
+              todayReps.textContent = totalReps;
+              
+              // Play sound
+              if (document.getElementById('sound-effects').checked) {
+                repSound.play().catch(e => console.log('Audio play error:', e));
+              }
+              
+              // Check for milestones
+              if (reps % 10 === 0) {
+                if (document.getElementById('sound-effects').checked) {
+                  milestoneSound.play().catch(e => console.log('Audio play error:', e));
+                }
+                
+                // Voice announcement
+                if (document.getElementById('voice-announcements').checked) {
+                  announceReps(reps);
+                }
+              }
+              
+              // Record rep timestamp
+              repHistory.push({
+                timestamp: Date.now(),
+                workout: workoutStartTime
+              });
+              
+              // Save to local storage
+              if (document.getElementById('save-history').checked) {
+                saveToLocalStorage();
+              }
+            }
+          }
+        } else {
+          // Just draw the frame without detection
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+      }
+      
+      requestAnimationFrame(optimizedDetectionLoop);
+    }
+    
+    // Initialize the application
+    async function initApp() {
+      // Show loader while initializing
+      loader.style.display = 'flex';
+      
+      try {
+        // Setup camera
+        await setupCamera();
+        
+        // Load settings
+        loadFromLocalStorage();
+        
+        // Setup event listeners
+        setupEventListeners();
+        
+        // Initialize charts
+        initCharts();
+        
+        // Start detection loop
+        optimizedDetectionLoop();
+        
+        // Hide loader
+        loader.style.display = 'none';
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        alert('Error initializing the application. Please refresh and try again.');
+      }
+    }
+
+    // Load OpenCV.js
+    function loadOpenCV() {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.setAttribute('async', '');
+        script.setAttribute('type', 'text/javascript');
+        script.setAttribute('src', 'https://docs.opencv.org/4.5.5/opencv.js');
+        
+        script.onload = () => {
+          console.log('OpenCV.js loaded');
+          cv.onRuntimeInitialized = () => {
+            console.log('OpenCV.js initialized');
+            resolve();
+          };
+        };
+        
+        script.onerror = () => {
+          reject(new Error('Failed to load OpenCV.js'));
+        };
+        
+        document.body.appendChild(script);
+      });
+    }
+
+    // Main initialization
+    window.onload = async () => {
+      try {
+        // Load OpenCV.js
+        await loadOpenCV();
+        
+        // Initialize the application
+        await initApp();
+      } catch (error) {
+        console.error('Initialization error:', error);
+        alert('Failed to initialize the application. Please check your internet connection and try again.');
+        loader.style.display = 'none';
+      }
+    };
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Wall Ball Rep Tracker</title>
