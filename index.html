@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Motion Rep Counter</title>
+  <title>Lax Counter</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -949,8 +949,8 @@
   <div id="loader">
     <div class="loader-content">
       <div class="loader-logo">
-        <div class="logo-icon">RC</div>
-        <div class="logo-text">RepCounter</div>
+        <div class="logo-icon">LC</div>
+        <div class="logo-text">Lax Counter</div>
       </div>
       <div class="loader-spinner"></div>
       <div class="loader-text">Loading OpenCV.js...</div>
@@ -966,8 +966,8 @@
     <!-- Sidebar -->
     <div class="sidebar">
       <div class="logo">
-        <div class="logo-icon">RC</div>
-        <div class="logo-text">RepCounter</div>
+        <div class="logo-icon">LC</div>
+        <div class="logo-text">Lax Counter</div>
       </div>
 
       <div class="nav-section">
@@ -1141,8 +1141,11 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Minimum Rep Duration (ms)</label>
-        <input type="number" class="form-control" id="min-rep-duration" value="300">
+        <label class="form-label">Pause Between Reps (ms)</label>
+        <input type="number" class="form-control" id="min-rep-duration" value="1000" min="300" max="5000" step="100">
+        <div style="font-size: 0.8rem; color: var(--gray); margin-top: 0.5rem;">
+          Controls both the minimum time between reps and the pause duration after each rep is counted.
+        </div>
       </div>
     </div>
 
@@ -1839,41 +1842,77 @@
     // Main detection loop
     function detectionLoop() {
       if (!video.paused && !video.ended) {
-        // Detect motion/color and check if a rep was completed
-        const repDetected = activeDetector.detect(ctx, video);
+        const now = Date.now();
         
-        if (repDetected && workoutActive && (Date.now() - lastRepTime) > minRepDuration) {
-          // Increment rep counter
-          reps++;
-          totalReps++;
-          lastRepTime = Date.now();
-          
-          // Update UI
-          repCounter.textContent = `${reps} reps`;
-          todayReps.textContent = totalReps;
-          
-          // Play sound
-          if (document.getElementById('sound-effects').checked) {
-            repSound.play().catch(e => console.log('Audio play error:', e));
+        // Check if we're in a pause period after a rep
+        if (inRepPause) {
+          // If the pause period is over, exit the pause state
+          if (now >= repPauseEndTime) {
+            inRepPause = false;
+            
+            // Optional: Show visual indicator that next rep can be counted
+            if (showDetection) {
+              ctx.fillStyle = 'rgba(46, 196, 182, 0.5)';
+              ctx.fillRect(canvas.width - 30, 10, 20, 20);
+              ctx.font = '16px Montserrat';
+              ctx.fillStyle = 'white';
+              ctx.fillText('Ready', canvas.width - 90, 25);
+            }
+          } else {
+            // Still in pause period, show countdown
+            if (showDetection) {
+              const remainingPause = Math.ceil((repPauseEndTime - now) / 1000);
+              ctx.fillStyle = 'rgba(255, 159, 28, 0.5)';
+              ctx.fillRect(canvas.width - 30, 10, 20, 20);
+              ctx.font = '16px Montserrat';
+              ctx.fillStyle = 'white';
+              ctx.fillText(`Pause: ${remainingPause}s`, canvas.width - 120, 25);
+            }
           }
           
-          // Check for milestones
-          if (reps % 10 === 0) {
+          // Still detect motion but don't count reps during pause
+          activeDetector.detect(ctx, video);
+        } else {
+          // Not in pause period, detect motion and check for reps
+          const repDetected = activeDetector.detect(ctx, video);
+          
+          if (repDetected && workoutActive && (now - lastRepTime) > minRepDuration) {
+            // Increment rep counter
+            reps++;
+            totalReps++;
+            lastRepTime = now;
+            
+            // Enter pause state
+            inRepPause = true;
+            repPauseEndTime = now + minRepDuration; // Use minRepDuration as pause duration
+            
+            // Update UI
+            repCounter.textContent = `${reps} reps`;
+            todayReps.textContent = totalReps;
+            
+            // Play sound
             if (document.getElementById('sound-effects').checked) {
-              milestoneSound.play().catch(e => console.log('Audio play error:', e));
+              repSound.play().catch(e => console.log('Audio play error:', e));
             }
             
-            // Voice announcement
-            if (document.getElementById('voice-announcements').checked) {
-              announceReps(reps);
+            // Check for milestones
+            if (reps % 10 === 0) {
+              if (document.getElementById('sound-effects').checked) {
+                milestoneSound.play().catch(e => console.log('Audio play error:', e));
+              }
+              
+              // Voice announcement
+              if (document.getElementById('voice-announcements').checked) {
+                announceReps(reps);
+              }
             }
+            
+            // Record rep timestamp
+            repHistory.push({
+              timestamp: now,
+              workout: workoutStartTime
+            });
           }
-          
-          // Record rep timestamp
-          repHistory.push({
-            timestamp: Date.now(),
-            workout: workoutStartTime
-          });
         }
       }
       
@@ -1999,6 +2038,18 @@
         minRepDuration = parseInt(e.target.value);
       });
       
+      // Pause duration change (using the same value as minRepDuration for simplicity)
+      document.getElementById('min-rep-duration').addEventListener('change', (e) => {
+        // If we're currently in a pause, update the end time based on new duration
+        if (inRepPause) {
+          const remainingPercentage = (repPauseEndTime - Date.now()) / (minRepDuration);
+          minRepDuration = parseInt(e.target.value);
+          repPauseEndTime = Date.now() + (minRepDuration * remainingPercentage);
+        } else {
+          minRepDuration = parseInt(e.target.value);
+        }
+      });
+      
       // Handle Safari audio unlock
       document.addEventListener('click', unlockAudio, { once: true });
       document.addEventListener('touchstart', unlockAudio, { once: true });
@@ -2057,6 +2108,9 @@
     
     // Frame skipping for performance optimization
     let frameCount = 0;
+    let inRepPause = false; // Flag to track if we're in the pause period after a rep
+    let repPauseEndTime = 0; // When the pause period ends
+    
     function optimizedDetectionLoop() {
       if (!video.paused && !video.ended) {
         // Process every 2nd frame for better performance
@@ -2067,45 +2121,81 @@
           
           // Only run detection if workout is active
           if (workoutActive) {
-            // Detect motion/color and check if a rep was completed
-            const repDetected = activeDetector.detect(ctx, video);
+            const now = Date.now();
             
-            if (repDetected && (Date.now() - lastRepTime) > minRepDuration) {
-              // Increment rep counter
-              reps++;
-              totalReps++;
-              lastRepTime = Date.now();
-              
-              // Update UI
-              repCounter.textContent = `${reps} reps`;
-              todayReps.textContent = totalReps;
-              
-              // Play sound
-              if (document.getElementById('sound-effects').checked) {
-                repSound.play().catch(e => console.log('Audio play error:', e));
+            // Check if we're in a pause period after a rep
+            if (inRepPause) {
+              // If the pause period is over, exit the pause state
+              if (now >= repPauseEndTime) {
+                inRepPause = false;
+                
+                // Optional: Show visual indicator that next rep can be counted
+                if (showDetection) {
+                  ctx.fillStyle = 'rgba(46, 196, 182, 0.5)';
+                  ctx.fillRect(canvas.width - 30, 10, 20, 20);
+                  ctx.font = '16px Montserrat';
+                  ctx.fillStyle = 'white';
+                  ctx.fillText('Ready', canvas.width - 90, 25);
+                }
+              } else {
+                // Still in pause period, show countdown
+                if (showDetection) {
+                  const remainingPause = Math.ceil((repPauseEndTime - now) / 1000);
+                  ctx.fillStyle = 'rgba(255, 159, 28, 0.5)';
+                  ctx.fillRect(canvas.width - 30, 10, 20, 20);
+                  ctx.font = '16px Montserrat';
+                  ctx.fillStyle = 'white';
+                  ctx.fillText(`Pause: ${remainingPause}s`, canvas.width - 120, 25);
+                }
               }
               
-              // Check for milestones
-              if (reps % 10 === 0) {
+              // Still detect motion but don't count reps during pause
+              activeDetector.detect(ctx, video);
+            } else {
+              // Not in pause period, detect motion and check for reps
+              const repDetected = activeDetector.detect(ctx, video);
+              
+              if (repDetected && (now - lastRepTime) > minRepDuration) {
+                // Increment rep counter
+                reps++;
+                totalReps++;
+                lastRepTime = now;
+                
+                // Enter pause state
+                inRepPause = true;
+                repPauseEndTime = now + minRepDuration; // Use minRepDuration as pause duration
+                
+                // Update UI
+                repCounter.textContent = `${reps} reps`;
+                todayReps.textContent = totalReps;
+                
+                // Play sound
                 if (document.getElementById('sound-effects').checked) {
-                  milestoneSound.play().catch(e => console.log('Audio play error:', e));
+                  repSound.play().catch(e => console.log('Audio play error:', e));
                 }
                 
-                // Voice announcement
-                if (document.getElementById('voice-announcements').checked) {
-                  announceReps(reps);
+                // Check for milestones
+                if (reps % 10 === 0) {
+                  if (document.getElementById('sound-effects').checked) {
+                    milestoneSound.play().catch(e => console.log('Audio play error:', e));
+                  }
+                  
+                  // Voice announcement
+                  if (document.getElementById('voice-announcements').checked) {
+                    announceReps(reps);
+                  }
                 }
-              }
-              
-              // Record rep timestamp
-              repHistory.push({
-                timestamp: Date.now(),
-                workout: workoutStartTime
-              });
-              
-              // Save to local storage
-              if (document.getElementById('save-history').checked) {
-                saveToLocalStorage();
+                
+                // Record rep timestamp
+                repHistory.push({
+                  timestamp: now,
+                  workout: workoutStartTime
+                });
+                
+                // Save to local storage
+                if (document.getElementById('save-history').checked) {
+                  saveToLocalStorage();
+                }
               }
             }
           }
