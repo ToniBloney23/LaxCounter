@@ -26,6 +26,7 @@
       margin-bottom: 0.5rem;
       font-size: 2.8rem;
       color: #4CAF50;
+      -webkit-animation: fadeInDown 1s ease-out;
       animation: fadeInDown 1s ease-out;
     }
     p {
@@ -75,6 +76,7 @@
       border-radius: 25px;
       color: white;
       cursor: pointer;
+      -webkit-transition: all 0.3s ease;
       transition: all 0.3s ease;
       text-transform: uppercase;
       letter-spacing: 1.5px;
@@ -82,6 +84,7 @@
       background-image: linear-gradient(to right, #2196F3, #1976D2);
     }
     .control-button:hover {
+        -webkit-transform: translateY(-3px);
         transform: translateY(-3px);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
     }
@@ -124,9 +127,11 @@
         padding: 0.5rem 0.8rem;
         border-radius: 50%;
         box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        -webkit-transition: all 0.2s ease-in-out;
         transition: all 0.2s ease-in-out;
     }
     #menu-icon:hover {
+        -webkit-transform: scale(1.1);
         transform: scale(1.1);
     }
     #menu-items {
@@ -140,12 +145,15 @@
         box-shadow: 0 8px 25px rgba(0,0,0,0.6);
         width: 280px;
         opacity: 0;
+        -webkit-transform: translateY(-10px);
         transform: translateY(-10px);
+        -webkit-transition: opacity 0.3s ease, -webkit-transform 0.3s ease;
         transition: opacity 0.3s ease, transform 0.3s ease;
     }
     #hamburger-menu.menu-open #menu-items {
         display: block;
         opacity: 1;
+        -webkit-transform: translateY(0);
         transform: translateY(0);
     }
     .menu-item {
@@ -154,6 +162,7 @@
         justify-content: space-between;
         align-items: center;
         cursor: pointer;
+        -webkit-transition: background-color 0.2s ease;
         transition: background-color 0.2s ease;
         font-size: 1.1rem;
     }
@@ -187,18 +196,21 @@
         bottom: 3px;
         background-color: white;
         border-radius: 50%;
+        -webkit-transition: -webkit-transform 0.2s ease;
         transition: transform 0.2s ease;
     }
     input:checked + .toggle-switch {
         background-color: #4CAF50;
     }
     input:checked + .toggle-switch::before {
+        -webkit-transform: translateX(20px);
         transform: translateX(20px);
     }
     #account-modal {
         position: fixed;
         top: 50%;
         left: 50%;
+        -webkit-transform: translate(-50%, -50%);
         transform: translate(-50%, -50%);
         background: #333;
         padding: 2rem;
@@ -224,6 +236,7 @@
         position: absolute;
         right: 10px;
         top: 50%;
+        -webkit-transform: translateY(-50%);
         transform: translateY(-50%);
         cursor: pointer;
         color: #999;
@@ -271,6 +284,14 @@
         font-size: 0.8rem;
         color: #555;
         z-index: 5000;
+    }
+    @-webkit-keyframes fadeInDown {
+        from { opacity: 0; -webkit-transform: translate3d(0, -20px, 0); }
+        to { opacity: 1; -webkit-transform: translate3d(0, 0, 0); }
+    }
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translate3d(0, -20px, 0); }
+        to { opacity: 1; transform: translate3d(0, 0, 0); }
     }
   </style>
 </head>
@@ -484,6 +505,17 @@
         gameLoop();
         startTimer();
 
+        // Unlock audio on first user interaction for Safari
+        const unlockAudio = () => {
+            repSound.play().catch(() => {});
+            repSound.pause();
+            repSound.currentTime = 0;
+            document.body.removeEventListener('click', unlockAudio);
+            document.body.removeEventListener('touchstart', unlockAudio);
+        };
+        document.body.addEventListener('click', unlockAudio);
+        document.body.addEventListener('touchstart', unlockAudio);
+
         document.getElementById('reset-button').addEventListener('click', () => {
             reps = 0;
             repTimestamps = [];
@@ -577,6 +609,6 @@
         script.onload = onOpenCvReady;
     }
   </script>
-  <div id="version-counter">v0.08</div>
+  <div id="version-counter">v0.09</div>
 </body>
 </html>
