@@ -2740,24 +2740,57 @@
         const loaderText = document.querySelector('.loader-text');
         const loaderMessage = document.querySelector('.loader-message');
         
-        // Define multiple CDN sources for fallback
+        // Define multiple CDN sources for fallback with more options
         const openCVSources = [
+          // Try local file first if available (you'll need to download this file)
+          window.location.origin + '/opencv.js',
+          window.location.origin + '/lib/opencv.js',
+          window.location.origin + '/js/opencv.js',
+          // Then try CDN sources
+          'https://docs.opencv.org/4.7.0/opencv.js', // Try older versions first as they might be more stable
+          'https://docs.opencv.org/4.8.0/opencv.js',
           'https://docs.opencv.org/4.9.0/opencv.js',
           'https://cdn.jsdelivr.net/npm/opencv.js@1.2.1/opencv.min.js',
-          'https://unpkg.com/opencv.js@1.2.1/opencv.js'
+          'https://unpkg.com/opencv.js@1.2.1/opencv.js',
+          'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.7.0-release.1/opencv.js',
+          'https://cdn.jsdelivr.net/npm/opencv-wasm@4.3.0-10/opencv.js',
+          // Additional fallbacks
+          'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.5.5-release.2/opencv.js',
+          'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.5.4-release.2/opencv.js'
         ];
         
         let currentSourceIndex = 0;
+        let loadAttempts = 0;
+        const maxAttempts = 2; // Try each source up to 2 times
+        
+        // Check if OpenCV is already loaded
+        if (typeof cv !== 'undefined') {
+          console.log('OpenCV.js already available');
+          progressBar.style.width = '100%';
+          percentageText.textContent = '100%';
+          return resolve();
+        }
         
         function tryLoadOpenCV() {
           if (currentSourceIndex >= openCVSources.length) {
-            loaderMessage.textContent = 'Failed to load OpenCV.js from all sources. Please check your internet connection.';
+            if (loadAttempts < maxAttempts) {
+              loadAttempts++;
+              currentSourceIndex = 0;
+              console.log(`Retrying all sources (attempt ${loadAttempts} of ${maxAttempts})`);
+              setTimeout(tryLoadOpenCV, 1000); // Wait a second before retrying
+              return;
+            }
+            
+            loaderMessage.textContent = 'Failed to load OpenCV.js from all sources. Please check your internet connection and refresh the page.';
+            loaderText.textContent = 'Loading Failed';
+            loaderText.style.color = 'var(--danger)';
             reject(new Error('Failed to load OpenCV.js from all sources'));
             return;
           }
           
           const currentSource = openCVSources[currentSourceIndex];
           loaderMessage.textContent = `Trying source ${currentSourceIndex + 1}/${openCVSources.length}`;
+          console.log(`Attempting to load OpenCV.js from: ${currentSource}`);
           
           // Reset progress indicators
           progressBar.style.width = '0%';
@@ -2767,6 +2800,9 @@
           const xhr = new XMLHttpRequest();
           xhr.open('GET', currentSource, true);
           xhr.responseType = 'blob';
+          
+          // Set timeout for the request
+          xhr.timeout = 15000; // 15 seconds timeout
           
           // Track loading progress
           xhr.onprogress = (event) => {
@@ -2788,8 +2824,17 @@
               script.setAttribute('type', 'text/javascript');
               script.setAttribute('src', scriptURL);
               
+              // Set a timeout for script loading
+              const scriptLoadTimeout = setTimeout(() => {
+                console.error(`Script load timeout for source ${currentSourceIndex + 1}`);
+                URL.revokeObjectURL(scriptURL);
+                currentSourceIndex++;
+                tryLoadOpenCV(); // Try next source
+              }, 20000); // 20 seconds timeout for script loading
+              
               script.onload = () => {
-                console.log('OpenCV.js loaded');
+                clearTimeout(scriptLoadTimeout);
+                console.log('OpenCV.js script loaded');
                 progressBar.style.width = '100%';
                 percentageText.textContent = '100%';
                 loaderText.textContent = 'Initializing OpenCV.js...';
@@ -2802,7 +2847,7 @@
                     const originalOnRuntimeInitialized = cv.onRuntimeInitialized;
                     cv.onRuntimeInitialized = () => {
                       originalOnRuntimeInitialized?.();
-                      console.log('OpenCV.js initialized');
+                      console.log('OpenCV.js initialized successfully');
                       // Clean up the URL object
                       URL.revokeObjectURL(scriptURL);
                       resolve();
@@ -2839,6 +2884,7 @@
                   setTimeout(() => {
                     clearInterval(checkInterval);
                     if (typeof cv === 'undefined') {
+                      console.error(`OpenCV object not found after loading from source ${currentSourceIndex + 1}`);
                       URL.revokeObjectURL(scriptURL);
                       currentSourceIndex++;
                       tryLoadOpenCV(); // Try next source
@@ -2848,6 +2894,7 @@
               };
               
               script.onerror = () => {
+                clearTimeout(scriptLoadTimeout);
                 console.error(`Failed to initialize OpenCV.js from source ${currentSourceIndex + 1}`);
                 URL.revokeObjectURL(scriptURL);
                 currentSourceIndex++;
@@ -2868,6 +2915,12 @@
             tryLoadOpenCV(); // Try next source
           };
           
+          xhr.ontimeout = () => {
+            console.error(`Timeout loading OpenCV.js from source ${currentSourceIndex + 1}`);
+            currentSourceIndex++;
+            tryLoadOpenCV(); // Try next source
+          };
+          
           xhr.send();
         }
         
@@ -2884,15 +2937,35 @@
         warnings: []
       };
       
-      // Detect device type
+      // Detect device type and browser
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
       const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isFirefox = navigator.userAgent.indexOf('Firefox') !== -1;
+      const isChrome = /Chrome/.test(navigator.userAgent) && !/Edge|Edg/.test(navigator.userAgent);
+      const isEdge = /Edge|Edg/.test(navigator.userAgent);
       
-      // Check for WebAssembly support (required for OpenCV.js)
-      if (typeof WebAssembly === 'undefined') {
+      // More detailed WebAssembly support check (required for OpenCV.js)
+      let webAssemblySupported = typeof WebAssembly !== 'undefined';
+      
+      if (!webAssemblySupported) {
         isCompatible.status = false;
-        isCompatible.issues.push('WebAssembly is not supported in this browser. OpenCV.js requires WebAssembly support.');
+        isCompatible.issues.push('WebAssembly is not supported in this browser. OpenCV.js requires WebAssembly support. Please use a modern browser like Chrome, Firefox, or Edge.');
+      } else {
+        // Check for more advanced WebAssembly features needed by OpenCV.js
+        try {
+          // Test if we can instantiate a simple module
+          const module = new WebAssembly.Module(new Uint8Array([
+            0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00
+          ]));
+          const instance = new WebAssembly.Instance(module);
+          
+          // If we get here, basic WebAssembly is working
+          console.log('WebAssembly basic support confirmed');
+        } catch (e) {
+          console.error('WebAssembly instantiation failed:', e);
+          isCompatible.warnings.push('Your browser has limited WebAssembly support. OpenCV.js may not work correctly.');
+        }
       }
       
       // Check for MediaDevices API (for camera access)
@@ -2925,6 +2998,12 @@
         if (isIOS) {
           if (isSafari) {
             isCompatible.warnings.push('On iOS Safari, you may need to enable camera access in Settings > Safari > Camera & Microphone Access.');
+            
+            // Check for iOS version - older versions have WebAssembly limitations
+            const iosVersion = (navigator.userAgent).match(/OS (\d+)_(\d+)_?(\d+)?/);
+            if (iosVersion && parseInt(iosVersion[1], 10) < 14) {
+              isCompatible.warnings.push('Your iOS version may have limited WebAssembly support. Consider updating your device for better performance.');
+            }
           }
           
           // Check for iOS PWA mode which has better camera access
@@ -2935,13 +3014,31 @@
         }
         
         // Android Chrome specific guidance
-        if (/Android/i.test(navigator.userAgent) && /Chrome/i.test(navigator.userAgent)) {
-          isCompatible.warnings.push('On Android, you may need to grant camera permissions when prompted.');
+        if (/Android/i.test(navigator.userAgent)) {
+          if (/Chrome/i.test(navigator.userAgent)) {
+            isCompatible.warnings.push('On Android Chrome, you may need to grant camera permissions when prompted.');
+            
+            // Check for Chrome version
+            const chromeVersion = navigator.userAgent.match(/Chrome\/(\d+)/);
+            if (chromeVersion && parseInt(chromeVersion[1], 10) < 90) {
+              isCompatible.warnings.push('Your Chrome version is older. Consider updating for better performance.');
+            }
+          } else {
+            isCompatible.warnings.push('For best experience on Android, use Chrome browser.');
+          }
         }
         
         // Check for device memory API and warn if low memory
-        if (navigator.deviceMemory && navigator.deviceMemory < 4) {
-          isCompatible.warnings.push('Your device has limited memory. Performance may be affected.');
+        if (navigator.deviceMemory) {
+          if (navigator.deviceMemory < 4) {
+            isCompatible.warnings.push('Your device has limited memory (less than 4GB). Performance may be affected.');
+          }
+          if (navigator.deviceMemory < 2) {
+            isCompatible.warnings.push('Your device has very limited memory (less than 2GB). The app may crash or run slowly.');
+          }
+        } else {
+          // If deviceMemory API is not available, make a general warning
+          isCompatible.warnings.push('Unable to detect device memory. If you experience performance issues, try closing other apps.');
         }
       }
       
@@ -3028,8 +3125,34 @@
           throw new Error('Browser compatibility issues: ' + compatibility.issues.join(' '));
         }
         
-        // Load OpenCV.js
-        await loadOpenCV();
+        // Display any compatibility warnings
+        if (compatibility.warnings.length > 0) {
+          const warningContainer = document.getElementById('warning-container');
+          const warningList = document.getElementById('warning-list');
+          
+          if (warningContainer && warningList) {
+            warningList.innerHTML = compatibility.warnings.map(warning => `<li>${warning}</li>`).join('');
+            warningContainer.style.display = 'block';
+            
+            // Auto-hide warnings after 10 seconds
+            setTimeout(() => {
+              warningContainer.style.opacity = '0';
+              setTimeout(() => {
+                warningContainer.style.display = 'none';
+                warningContainer.style.opacity = '1';
+              }, 500);
+            }, 10000);
+          }
+        }
+        
+        // Load OpenCV.js with specific error handling
+        try {
+          await loadOpenCV();
+          console.log('OpenCV loaded successfully');
+        } catch (opencvError) {
+          console.error('OpenCV loading failed:', opencvError);
+          throw new Error(`Failed to load OpenCV: ${opencvError.message}`);
+        }
         
         // Initialize the application
         await initApp();
@@ -3042,11 +3165,37 @@
         const loaderSpinner = document.querySelector('.loader-spinner');
         
         if (loaderText) loaderText.textContent = 'Installation Failed';
+        
+        // Check if the error is related to OpenCV
+        const isOpenCVError = error.message.includes('OpenCV') || error.message.includes('cv');
+        
         if (loaderMessage) {
-          loaderMessage.textContent = 'Please try refreshing the page or check your internet connection. ' + 
-                                    'If the problem persists, try using a different browser.';
+          // Provide more specific error messages based on the error type
+          if (isOpenCVError) {
+            loaderMessage.innerHTML = `
+              <p>Failed to load OpenCV.js library. This could be due to:</p>
+              <ul>
+                <li>Network connectivity issues</li>
+                <li>Content blockers or ad blockers</li>
+                <li>Browser security settings</li>
+                <li>Insufficient memory on your device</li>
+              </ul>
+              <p>Please try:</p>
+              <ul>
+                <li>Refreshing the page</li>
+                <li>Using a different browser (Chrome or Firefox recommended)</li>
+                <li>Disabling content blockers or ad blockers</li>
+                <li>Clearing your browser cache</li>
+                <li>Closing other tabs and applications</li>
+              </ul>
+            `;
+          } else {
+            loaderMessage.textContent = 'Please try refreshing the page or check your internet connection. ' + 
+                                      'If the problem persists, try using a different browser.';
+          }
           loaderMessage.style.color = 'var(--danger)';
         }
+        
         if (loaderSpinner) {
           loaderSpinner.style.borderTopColor = 'var(--danger)';
           loaderSpinner.style.borderLeftColor = 'var(--danger)';
