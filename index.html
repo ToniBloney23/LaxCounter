@@ -844,12 +844,28 @@
         left: 0;
         top: 0;
         width: 280px;
+        height: 100vh;
         z-index: 1000;
         transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
       }
 
       .sidebar.open {
         transform: translateX(0);
+      }
+      
+      /* Add overlay when sidebar is open */
+      .sidebar.open::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: -1;
       }
 
       .main-content {
@@ -858,6 +874,35 @@
 
       .dashboard-grid {
         grid-template-columns: 1fr;
+      }
+      
+      /* Improved menu toggle button */
+      .menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: var(--primary);
+        color: white;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1001;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.5rem;
+      }
+      
+      .menu-toggle::before {
+        content: '☰';
+      }
+      
+      .menu-toggle.active {
+        transform: rotate(90deg);
+        background: var(--danger);
       }
     }
 
@@ -878,12 +923,14 @@
       .btn {
         padding: 0.6rem 1rem;
         font-size: 0.85rem;
+        min-height: 44px; /* Apple's recommended minimum touch target size */
       }
 
       .settings-panel {
         width: 100%;
         max-height: 80vh;
         overflow-y: auto;
+        padding: 1rem;
       }
       
       .video-container {
@@ -908,6 +955,43 @@
       canvas {
         max-width: 100%;
         height: auto;
+      }
+      
+      /* Mobile-specific improvements */
+      .form-control, select {
+        font-size: 16px; /* Prevent iOS zoom on focus */
+        height: 44px;
+      }
+      
+      input[type="range"] {
+        height: 44px;
+      }
+      
+      .toggle-switch {
+        min-height: 30px;
+      }
+      
+      /* Prevent pull-to-refresh */
+      html, body {
+        overscroll-behavior-y: contain;
+      }
+      
+      /* Camera flip button for mobile */
+      .camera-flip-btn {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        z-index: 10;
       }
     }
 
@@ -1109,6 +1193,8 @@
         <div class="video-overlay">
           <button class="btn btn-outline btn-icon" id="toggle-detection">👁️</button>
           <button class="btn btn-danger btn-icon" id="reset-counter">🔄</button>
+          <!-- Camera flip button (only visible on mobile) -->
+          <button class="btn btn-primary btn-icon" id="camera-flip" style="display: none;">📱</button>
         </div>
         
         <div class="video-controls">
@@ -2066,17 +2152,34 @@
     const poseDetector = new PoseDetector();
     let activeDetector = motionDetector;
 
-    // Setup camera
+    // Setup camera with mobile optimizations
     async function setupCamera() {
       try {
+        // Check if this is a mobile device
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Adjust constraints based on device type
         const constraints = {
           video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: isMobile ? 720 : 1280 },
+            height: { ideal: isMobile ? 480 : 720 },
             facingMode: 'user'
           }
         };
         
+        // For iOS Safari, we need to handle orientation changes
+        const handleOrientationChange = () => {
+          setTimeout(() => {
+            if (video.videoWidth > 0) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+            }
+          }, 300); // Small delay to allow video dimensions to update
+        };
+        
+        window.addEventListener('orientationchange', handleOrientationChange);
+        
+        // Get camera stream
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
         
@@ -2085,12 +2188,57 @@
             // Set canvas dimensions to match video
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            
+            // Use the existing camera flip button for mobile devices
+            const cameraFlipBtn = document.getElementById('camera-flip');
+            if (isMobile && cameraFlipBtn) {
+              // Show the camera flip button
+              cameraFlipBtn.style.display = 'flex';
+              cameraFlipBtn.title = 'Switch Camera';
+              
+              // Set initial icon based on current camera
+              cameraFlipBtn.innerHTML = constraints.video.facingMode === 'user' ? '📱' : '🤳';
+              
+              // Add click event listener
+              cameraFlipBtn.addEventListener('click', async () => {
+                // Toggle between front and back camera
+                const currentFacingMode = constraints.video.facingMode;
+                constraints.video.facingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+                
+                // Update button icon
+                cameraFlipBtn.innerHTML = constraints.video.facingMode === 'user' ? '📱' : '🤳';
+                
+                // Stop current stream
+                stream.getTracks().forEach(track => track.stop());
+                
+                try {
+                  // Get new stream with updated constraints
+                  const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                  video.srcObject = newStream;
+                  
+                  // Update canvas dimensions after camera switch
+                  setTimeout(() => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                  }, 300);
+                } catch (err) {
+                  console.error('Error flipping camera:', err);
+                  alert('Unable to flip camera. Your device may not support this feature.');
+                  // Revert to previous camera
+                  constraints.video.facingMode = currentFacingMode;
+                  cameraFlipBtn.innerHTML = constraints.video.facingMode === 'user' ? '📱' : '🤳';
+                  const revertStream = await navigator.mediaDevices.getUserMedia(constraints);
+                  video.srcObject = revertStream;
+                }
+              });
+            }
+            
             resolve();
           };
         });
       } catch (error) {
         console.error('Error accessing camera:', error);
-        alert('Error accessing camera. Please make sure you have granted camera permissions.');
+        alert('Error accessing camera. Please make sure you have granted camera permissions and are using a supported browser.');
       }
     }
 
@@ -2255,14 +2403,59 @@
         focusMode = document.body.classList.contains('focus-mode');
       });
       
-      // Settings panel
+      // Settings panel with mobile improvements
       openSettingsBtn.addEventListener('click', () => {
         settingsPanel.classList.add('open');
+        
+        // On mobile, scroll to settings panel when opened
+        if (window.innerWidth <= 576) {
+          setTimeout(() => {
+            settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        }
       });
       
       closeSettingsBtn.addEventListener('click', () => {
         settingsPanel.classList.remove('open');
       });
+      
+      // Add swipe gesture support for mobile devices
+      let touchStartX = 0;
+      let touchEndX = 0;
+      
+      document.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+      }, false);
+      
+      document.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+      }, false);
+      
+      function handleSwipe() {
+        const swipeThreshold = 100; // Minimum distance for swipe
+        
+        // Right to left swipe (open settings)
+        if (touchEndX < touchStartX - swipeThreshold) {
+          if (!settingsPanel.classList.contains('open')) {
+            settingsPanel.classList.add('open');
+            
+            // On mobile, scroll to settings panel when opened
+            if (window.innerWidth <= 576) {
+              setTimeout(() => {
+                settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 100);
+            }
+          }
+        }
+        
+        // Left to right swipe (close settings)
+        if (touchEndX > touchStartX + swipeThreshold) {
+          if (settingsPanel.classList.contains('open')) {
+            settingsPanel.classList.remove('open');
+          }
+        }
+      }
       
       // Detection type change
       document.getElementById('detection-type').addEventListener('change', (e) => {
@@ -2484,11 +2677,58 @@
         // Start detection loop
         optimizedDetectionLoop();
         
+        // Add mobile menu toggle functionality
+        setupMobileMenu();
+        
         // Hide loader
         loader.style.display = 'none';
       } catch (error) {
         console.error('Error initializing app:', error);
         alert('Error initializing the application. Please refresh and try again.');
+      }
+    }
+    
+    // Setup mobile-specific menu functionality
+    function setupMobileMenu() {
+      const menuToggle = document.querySelector('.menu-toggle');
+      const sidebar = document.querySelector('.sidebar');
+      
+      if (menuToggle && sidebar) {
+        menuToggle.addEventListener('click', () => {
+          sidebar.classList.toggle('open');
+          menuToggle.classList.toggle('active');
+        });
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+          if (window.innerWidth <= 576 && 
+              sidebar.classList.contains('open') && 
+              !sidebar.contains(e.target) && 
+              !menuToggle.contains(e.target)) {
+            sidebar.classList.remove('open');
+            menuToggle.classList.remove('active');
+          }
+        });
+        
+        // Add double-tap to close for mobile
+        let lastTap = 0;
+        document.addEventListener('touchend', (e) => {
+          const currentTime = new Date().getTime();
+          const tapLength = currentTime - lastTap;
+          
+          if (tapLength < 500 && tapLength > 0) {
+            // Double tap detected
+            if (window.innerWidth <= 576 && 
+                sidebar.classList.contains('open') && 
+                !sidebar.contains(e.target) && 
+                !menuToggle.contains(e.target)) {
+              sidebar.classList.remove('open');
+              menuToggle.classList.remove('active');
+            }
+          }
+          
+          lastTap = currentTime;
+        });
       }
     }
 
@@ -2636,12 +2876,18 @@
       });
     }
 
-    // Check browser compatibility
+    // Check browser compatibility with enhanced mobile support
     function checkBrowserCompatibility() {
       const isCompatible = {
         status: true,
-        issues: []
+        issues: [],
+        warnings: []
       };
+      
+      // Detect device type
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
       
       // Check for WebAssembly support (required for OpenCV.js)
       if (typeof WebAssembly === 'undefined') {
@@ -2666,8 +2912,108 @@
         localStorage.setItem('test', 'test');
         localStorage.removeItem('test');
       } catch (e) {
-        isCompatible.status = false;
-        isCompatible.issues.push('LocalStorage is not available. Workout history will not be saved.');
+        // Make this a warning instead of a critical issue
+        isCompatible.warnings.push('LocalStorage is not available. Workout history will not be saved.');
+      }
+      
+      // Mobile-specific checks
+      if (isMobile) {
+        // Add mobile-specific warnings
+        isCompatible.warnings.push('For best experience, use your device in landscape orientation.');
+        
+        // iOS Safari specific warnings
+        if (isIOS) {
+          if (isSafari) {
+            isCompatible.warnings.push('On iOS Safari, you may need to enable camera access in Settings > Safari > Camera & Microphone Access.');
+          }
+          
+          // Check for iOS PWA mode which has better camera access
+          const isInPWA = window.navigator.standalone === true;
+          if (!isInPWA) {
+            isCompatible.warnings.push('For better performance, add this app to your home screen.');
+          }
+        }
+        
+        // Android Chrome specific guidance
+        if (/Android/i.test(navigator.userAgent) && /Chrome/i.test(navigator.userAgent)) {
+          isCompatible.warnings.push('On Android, you may need to grant camera permissions when prompted.');
+        }
+        
+        // Check for device memory API and warn if low memory
+        if (navigator.deviceMemory && navigator.deviceMemory < 4) {
+          isCompatible.warnings.push('Your device has limited memory. Performance may be affected.');
+        }
+      }
+      
+      // Display warnings if there are any but the app is still compatible
+      if (isCompatible.warnings.length > 0 && isCompatible.status) {
+        // Create a warning element that will be shown after the app loads
+        window.addEventListener('DOMContentLoaded', () => {
+          setTimeout(() => {
+            const warningElement = document.createElement('div');
+            warningElement.className = 'mobile-compatibility-warning';
+            warningElement.innerHTML = `
+              <div class="warning-content">
+                <h3>⚠️ Tips for Better Experience</h3>
+                <ul>${isCompatible.warnings.map(w => `<li>${w}</li>`).join('')}</ul>
+                <button class="btn btn-sm btn-outline close-warning">Got it</button>
+              </div>
+            `;
+            document.body.appendChild(warningElement);
+            
+            // Style the warning
+            const style = document.createElement('style');
+            style.textContent = `
+              .mobile-compatibility-warning {
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(26, 26, 46, 0.95);
+                border: 1px solid var(--primary);
+                border-radius: 12px;
+                padding: 15px;
+                z-index: 9999;
+                max-width: 90%;
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.5s ease-out;
+              }
+              .warning-content h3 {
+                font-size: 1rem;
+                margin-bottom: 10px;
+                color: var(--warning);
+              }
+              .warning-content ul {
+                padding-left: 20px;
+                margin-bottom: 15px;
+                font-size: 0.85rem;
+              }
+              .close-warning {
+                padding: 5px 10px;
+                font-size: 0.8rem;
+              }
+              @keyframes slideUp {
+                from { transform: translate(-50%, 100%); opacity: 0; }
+                to { transform: translate(-50%, 0); opacity: 1; }
+              }
+            `;
+            document.head.appendChild(style);
+            
+            // Add close button functionality
+            warningElement.querySelector('.close-warning').addEventListener('click', () => {
+              warningElement.style.animation = 'slideDown 0.5s ease-out forwards';
+              setTimeout(() => warningElement.remove(), 500);
+            });
+            
+            // Auto-hide after 15 seconds
+            setTimeout(() => {
+              if (document.body.contains(warningElement)) {
+                warningElement.style.animation = 'slideDown 0.5s ease-out forwards';
+                setTimeout(() => warningElement.remove(), 500);
+              }
+            }, 15000);
+          }, 3000); // Show warnings 3 seconds after app loads
+        });
       }
       
       return isCompatible;
