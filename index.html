@@ -871,14 +871,43 @@
       .action-buttons {
         width: 100%;
         justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      
+      .btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
       }
 
       .settings-panel {
         width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
       }
-
+      
+      .video-container {
+        height: auto;
+        max-height: 70vh;
+      }
+      
+      .controls {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+      
       .stat-value {
-        font-size: 2rem;
+        font-size: 1.75rem;
+      }
+      
+      .dashboard-grid .card {
+        padding: 1rem;
+      }
+      
+      canvas {
+        max-width: 100%;
+        height: auto;
       }
     }
 
@@ -1316,10 +1345,12 @@
       new Chart(ctx, config);
     }
 
-    // Motion Detector Class
+    // Enhanced Motion Detector Class
     class MotionDetector {
       constructor() {
         this.previousFrame = null;
+        this.backgroundFrame = null;
+        this.backgroundAlpha = 0.05; // Background adaptation rate
         this.motionThreshold = 30; // Default threshold
         this.minMotionPixels = 1000; // Minimum number of pixels that need to change
         this.motionState = 'idle'; // idle, moving, cooldown
@@ -1327,6 +1358,15 @@
         this.cooldownPeriod = 300; // ms
         this.consecutiveFrames = 0;
         this.requiredFrames = 3; // Number of consecutive frames needed to confirm motion
+        this.motionHistory = []; // Store recent motion values for smoothing
+        this.historySize = 5; // Number of frames to keep in history
+        this.regionSize = 16; // Size of regions for regional motion detection
+        this.regionThreshold = 0.6; // Percentage of region that must show motion
+        this.motionRegions = []; // Track which regions have motion
+        this.adaptiveThreshold = true; // Use adaptive thresholding
+        this.noiseReduction = true; // Apply noise reduction
+        this.frameSkip = 0; // Process every frame by default
+        this.frameCount = 0;
       }
 
       setSensitivity(value) {
@@ -1334,49 +1374,134 @@
         this.motionThreshold = 50 - (value * 4); // Higher sensitivity = lower threshold
         this.minMotionPixels = 2000 - (value * 150); // Higher sensitivity = fewer pixels needed
         this.requiredFrames = Math.max(2, 5 - Math.floor(value / 2)); // Higher sensitivity = fewer frames needed
+        this.regionThreshold = 0.7 - (value * 0.03); // Higher sensitivity = lower region threshold
+        this.backgroundAlpha = 0.01 + (value * 0.01); // Higher sensitivity = faster background adaptation
       }
 
       detect(context, videoElement) {
         // Draw current frame to canvas
         context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
         
+        // Skip frames if needed (for performance)
+        this.frameCount++;
+        if (this.frameSkip > 0 && (this.frameCount % (this.frameSkip + 1) !== 0)) {
+          return false;
+        }
+        
         // Get current frame data
         const currentFrame = context.getImageData(0, 0, canvas.width, canvas.height);
+        const currentData = currentFrame.data;
         
         // If we don't have a previous frame, store this one and return
         if (!this.previousFrame) {
           this.previousFrame = currentFrame;
+          this.backgroundFrame = new ImageData(
+            new Uint8ClampedArray(currentData), 
+            currentFrame.width, 
+            currentFrame.height
+          );
           return false;
         }
         
-        const currentData = currentFrame.data;
         const previousData = this.previousFrame.data;
+        const backgroundData = this.backgroundFrame.data;
         let motionPixels = 0;
         
-        // Compare frames to detect motion
-        for (let i = 0; i < currentData.length; i += 4) {
-          // Calculate difference in RGB values
-          const rdiff = Math.abs(currentData[i] - previousData[i]);
-          const gdiff = Math.abs(currentData[i+1] - previousData[i+1]);
-          const bdiff = Math.abs(currentData[i+2] - previousData[i+2]);
-          
-          // If the difference is above threshold, count it as motion
-          if (rdiff > this.motionThreshold || gdiff > this.motionThreshold || bdiff > this.motionThreshold) {
-            motionPixels++;
+        // Initialize or reset motion regions
+        if (this.motionRegions.length === 0) {
+          const regionsX = Math.ceil(canvas.width / this.regionSize);
+          const regionsY = Math.ceil(canvas.height / this.regionSize);
+          this.motionRegions = new Array(regionsX * regionsY).fill(0);
+        } else {
+          this.motionRegions.fill(0);
+        }
+        
+        // Compare frames to detect motion with regional analysis
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const i = (y * canvas.width + x) * 4;
             
-            // Optionally highlight motion pixels if detection overlay is enabled
-            if (showDetection) {
-              // Calculate x, y from array index
-              const pixelIndex = i / 4;
-              const x = pixelIndex % canvas.width;
-              const y = Math.floor(pixelIndex / canvas.width);
+            // Calculate region index
+            const regionX = Math.floor(x / this.regionSize);
+            const regionY = Math.floor(y / this.regionSize);
+            const regionIdx = regionY * Math.ceil(canvas.width / this.regionSize) + regionX;
+            
+            // Calculate pixel brightness (simple grayscale conversion)
+            const currentBrightness = (currentData[i] * 0.299 + currentData[i+1] * 0.587 + currentData[i+2] * 0.114) / 255;
+            const prevBrightness = (previousData[i] * 0.299 + previousData[i+1] * 0.587 + previousData[i+2] * 0.114) / 255;
+            const bgBrightness = (backgroundData[i] * 0.299 + backgroundData[i+1] * 0.587 + backgroundData[i+2] * 0.114) / 255;
+            
+            // Calculate difference from both previous frame and background model
+            const frameDiff = Math.abs(currentBrightness - prevBrightness);
+            const bgDiff = Math.abs(currentBrightness - bgBrightness);
+            
+            // Determine threshold (fixed or adaptive)
+            let threshold = this.motionThreshold / 255; // Convert to 0-1 range
+            if (this.adaptiveThreshold) {
+              // Make threshold adaptive based on local brightness
+              threshold *= (0.5 + currentBrightness * 0.5); // Brighter areas need more change
+            }
+            
+            // Detect motion using both frame difference and background difference
+            if (frameDiff > threshold && bgDiff > threshold * 0.5) {
+              // Count as motion pixel
+              motionPixels++;
+              this.motionRegions[regionIdx]++;
               
-              // Draw a small semi-transparent rectangle at motion point
-              context.fillStyle = 'rgba(76, 201, 240, 0.5)';
-              context.fillRect(x, y, 2, 2);
+              // Update background model (slower for moving pixels)
+              backgroundData[i] = backgroundData[i] * (1 - this.backgroundAlpha * 0.2) + currentData[i] * (this.backgroundAlpha * 0.2);
+              backgroundData[i+1] = backgroundData[i+1] * (1 - this.backgroundAlpha * 0.2) + currentData[i+1] * (this.backgroundAlpha * 0.2);
+              backgroundData[i+2] = backgroundData[i+2] * (1 - this.backgroundAlpha * 0.2) + currentData[i+2] * (this.backgroundAlpha * 0.2);
+              
+              // Optionally highlight motion pixels if detection overlay is enabled
+              if (showDetection) {
+                // Draw a small semi-transparent rectangle at motion point
+                context.fillStyle = 'rgba(76, 201, 240, 0.5)';
+                context.fillRect(x, y, 2, 2);
+              }
+            } else {
+              // Update background model (faster for static pixels)
+              backgroundData[i] = backgroundData[i] * (1 - this.backgroundAlpha) + currentData[i] * this.backgroundAlpha;
+              backgroundData[i+1] = backgroundData[i+1] * (1 - this.backgroundAlpha) + currentData[i+1] * this.backgroundAlpha;
+              backgroundData[i+2] = backgroundData[i+2] * (1 - this.backgroundAlpha) + currentData[i+2] * this.backgroundAlpha;
             }
           }
         }
+        
+        // Count regions with significant motion
+        let activeRegions = 0;
+        const pixelsPerRegion = this.regionSize * this.regionSize;
+        
+        for (let i = 0; i < this.motionRegions.length; i++) {
+          if (this.motionRegions[i] > pixelsPerRegion * this.regionThreshold) {
+            activeRegions++;
+            
+            // Visualize active regions if detection overlay is enabled
+            if (showDetection) {
+              const regionsPerRow = Math.ceil(canvas.width / this.regionSize);
+              const regionY = Math.floor(i / regionsPerRow);
+              const regionX = i % regionsPerRow;
+              
+              context.strokeStyle = 'rgba(231, 29, 54, 0.7)';
+              context.lineWidth = 2;
+              context.strokeRect(
+                regionX * this.regionSize, 
+                regionY * this.regionSize, 
+                this.regionSize, 
+                this.regionSize
+              );
+            }
+          }
+        }
+        
+        // Add current motion value to history for smoothing
+        this.motionHistory.push(motionPixels);
+        if (this.motionHistory.length > this.historySize) {
+          this.motionHistory.shift();
+        }
+        
+        // Calculate smoothed motion value
+        const smoothedMotion = this.motionHistory.reduce((sum, val) => sum + val, 0) / this.motionHistory.length;
         
         // Store current frame as previous for next comparison
         this.previousFrame = currentFrame;
@@ -1384,8 +1509,10 @@
         const now = Date.now();
         let repDetected = false;
         
-        // State machine for rep detection
-        if (motionPixels > this.minMotionPixels) {
+        // State machine for rep detection using smoothed motion and active regions
+        const motionDetected = smoothedMotion > this.minMotionPixels || activeRegions > (this.motionRegions.length * 0.1);
+        
+        if (motionDetected) {
           // Motion detected
           if (this.motionState === 'idle') {
             this.consecutiveFrames++;
@@ -1409,18 +1536,52 @@
           }
         }
         
-        // Draw motion state indicator if detection overlay is enabled
+        // Draw motion state indicator and debug information if detection overlay is enabled
         if (showDetection) {
-          context.fillStyle = this.motionState === 'idle' ? 'rgba(46, 196, 182, 0.5)' : 
-                             this.motionState === 'moving' ? 'rgba(231, 29, 54, 0.5)' : 
-                             'rgba(255, 159, 28, 0.5)';
-          context.fillRect(10, 10, 20, 20);
+          // Draw state indicator
+          const stateColors = {
+            'idle': 'rgba(46, 196, 182, 0.8)',
+            'moving': 'rgba(231, 29, 54, 0.8)',
+            'cooldown': 'rgba(255, 159, 28, 0.8)'
+          };
           
-          // Add text label
+          context.fillStyle = stateColors[this.motionState];
+          context.fillRect(10, 10, 30, 30);
+          
+          // Draw motion level bar
+          const barWidth = 150;
+          const barHeight = 15;
+          const barX = 50;
+          const barY = 18;
+          const motionPercentage = Math.min(1, smoothedMotion / (this.minMotionPixels * 1.5));
+          
+          // Background bar
+          context.fillStyle = 'rgba(255, 255, 255, 0.2)';
+          context.fillRect(barX, barY, barWidth, barHeight);
+          
+          // Motion level bar
+          context.fillStyle = motionPercentage > 0.8 ? 'rgba(231, 29, 54, 0.8)' : 
+                             motionPercentage > 0.4 ? 'rgba(255, 159, 28, 0.8)' : 
+                             'rgba(46, 196, 182, 0.8)';
+          context.fillRect(barX, barY, barWidth * motionPercentage, barHeight);
+          
+          // Threshold marker
+          const thresholdPosition = barX + (barWidth * (this.minMotionPixels / (this.minMotionPixels * 1.5)));
+          context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          context.fillRect(thresholdPosition - 1, barY - 5, 2, barHeight + 10);
+          
+          // Add text labels
           context.font = '16px Montserrat';
           context.fillStyle = 'white';
-          context.fillText(`Motion: ${motionPixels}`, 40, 25);
-          context.fillText(`State: ${this.motionState}`, 40, 50);
+          context.fillText(`State: ${this.motionState}`, 50, 50);
+          context.fillText(`Motion: ${Math.round(smoothedMotion)}`, 50, 75);
+          context.fillText(`Regions: ${activeRegions}/${this.motionRegions.length}`, 50, 100);
+          context.fillText(`Threshold: ${this.minMotionPixels}`, 50, 125);
+          
+          // Draw frame processing info
+          if (this.frameSkip > 0) {
+            context.fillText(`Processing: 1/${this.frameSkip + 1} frames`, 50, 150);
+          }
         }
         
         return repDetected;
@@ -1579,12 +1740,12 @@
       }
     }
 
-    // PoseDetector Class for shoulder and arm tracking
+    // PoseDetector Class for hand and arm tracking
     class PoseDetector {
       constructor() {
-        this.previousShoulderY = null;
-        this.lowestShoulderY = null;
-        this.highestShoulderY = null;
+        this.previousHandY = null;
+        this.lowestHandY = null;
+        this.highestHandY = null;
         this.rangeOfMotionThreshold = 0.65; // 65% range of motion required for a rep
         this.movementState = 'idle'; // idle, up, down
         this.lastStateChange = 0;
@@ -1593,7 +1754,13 @@
         this.shoulderY = 0;
         this.armX = 0;
         this.armY = 0;
+        this.handX = 0;
+        this.handY = 0;
         this.calibrated = false;
+        this.handDetected = false;
+        this.armDetected = false;
+        this.movementHistory = []; // Store recent movement values for smoothing
+        this.historySize = 5; // Number of frames to keep in history
       }
 
       setSensitivity(value) {
@@ -1608,8 +1775,7 @@
         // Draw current frame to canvas
         context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
         
-        // Simulate shoulder and arm tracking with color detection
-        // In a real implementation, this would use a pose estimation model
+        // Hand and arm tracking with color detection
         let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
         let hsv = new cv.Mat();
         let mask = new cv.Mat();
@@ -1623,22 +1789,28 @@
         cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
         cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
         
-        // Define range for skin color in HSV (simplified)
+        // Define range for skin color in HSV (improved for hand detection)
         let lowerBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 20, 70, 0]);
-        let upperBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [20, 150, 255, 255]);
+        let upperBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [25, 170, 255, 255]);
         
         // Threshold the HSV image to get only skin colors
         cv.inRange(hsv, lowerBound, upperBound, mask);
         
+        // Apply morphological operations to improve hand detection
+        let kernel = cv.Mat.ones(3, 3, cv.CV_8U);
+        cv.morphologyEx(mask, mask, cv.MORPH_OPEN, kernel);
+        cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kernel);
+        kernel.delete();
+        
         // Find contours
         cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
         
-        // Find the two largest contours (shoulder and arm)
+        // Find contours that could be hand, arm, or shoulder
         let areas = [];
         for (let i = 0; i < contours.size(); ++i) {
           let contour = contours.get(i);
           let area = cv.contourArea(contour);
-          if (area > 500) { // Minimum area threshold
+          if (area > 300) { // Lower threshold to detect smaller hand regions
             areas.push({index: i, area: area});
           }
         }
@@ -1649,25 +1821,73 @@
         let repDetected = false;
         const now = Date.now();
         
-        // If we found at least one contour (ideally two for shoulder and arm)
+        // Reset detection flags
+        this.handDetected = false;
+        this.armDetected = false;
+        
+        // If we found at least one contour
         if (areas.length > 0) {
-          // Use the largest contour as the shoulder
+          // Process the contours to identify hand, arm, and shoulder
+          // We'll use position and size heuristics to identify body parts
+          
+          // First, find the largest contour (likely the main body/shoulder area)
           let shoulderContour = contours.get(areas[0].index);
           let shoulderRect = cv.boundingRect(shoulderContour);
           
           this.shoulderX = shoulderRect.x + (shoulderRect.width / 2);
           this.shoulderY = shoulderRect.y + (shoulderRect.height / 2);
           
-          // If we have a second contour, use it as the arm
-          if (areas.length > 1) {
-            let armContour = contours.get(areas[1].index);
-            let armRect = cv.boundingRect(armContour);
+          // Look for smaller contours that could be the arm or hand
+          // We'll use the top 3 contours if available
+          let potentialParts = Math.min(areas.length, 3);
+          
+          for (let i = 0; i < potentialParts; i++) {
+            let contour = contours.get(areas[i].index);
+            let rect = cv.boundingRect(contour);
+            let centerX = rect.x + (rect.width / 2);
+            let centerY = rect.y + (rect.height / 2);
             
-            this.armX = armRect.x + (armRect.width / 2);
-            this.armY = armRect.y + (armRect.height / 2);
+            // Use heuristics to identify parts
+            // Hand is typically smaller and can be at the extremity
+            if (!this.handDetected && rect.width < shoulderRect.width * 0.7 && rect.height < shoulderRect.height * 0.7) {
+              this.handX = centerX;
+              this.handY = centerY;
+              this.handDetected = true;
+              
+              // Draw hand point if detection overlay is enabled
+              if (showDetection) {
+                context.fillStyle = '#e71d36';
+                context.beginPath();
+                context.arc(this.handX, this.handY, 8, 0, 2 * Math.PI);
+                context.fill();
+                context.fillText('Hand', this.handX + 15, this.handY);
+              }
+            }
+            // Arm is typically medium-sized and between shoulder and hand
+            else if (!this.armDetected && rect.width < shoulderRect.width * 0.9) {
+              this.armX = centerX;
+              this.armY = centerY;
+              this.armDetected = true;
+              
+              // Draw arm point if detection overlay is enabled
+              if (showDetection) {
+                context.fillStyle = '#4cc9f0';
+                context.beginPath();
+                context.arc(this.armX, this.armY, 8, 0, 2 * Math.PI);
+                context.fill();
+                context.fillText('Arm', this.armX + 15, this.armY);
+              }
+            }
           }
           
-          // Draw tracking points if detection overlay is enabled
+          // If we couldn't detect a separate hand, use the arm position as a fallback
+          if (!this.handDetected && this.armDetected) {
+            this.handX = this.armX;
+            this.handY = this.armY;
+            this.handDetected = true;
+          }
+          
+          // Draw additional tracking elements if detection overlay is enabled
           if (showDetection) {
             // Draw shoulder point
             context.fillStyle = '#4cc9f0';
@@ -1676,14 +1896,19 @@
             context.fill();
             context.fillText('Shoulder', this.shoulderX + 15, this.shoulderY);
             
-            // Draw arm point if detected
-            if (areas.length > 1) {
-              context.fillStyle = '#e71d36';
+            // Draw connecting lines between detected body parts
+            if (this.armDetected && this.handDetected) {
+              // Draw line connecting shoulder, arm, and hand
+              context.strokeStyle = '#ffffff';
+              context.lineWidth = 2;
               context.beginPath();
-              context.arc(this.armX, this.armY, 8, 0, 2 * Math.PI);
-              context.fill();
-              context.fillText('Arm', this.armX + 15, this.armY);
-              
+              context.moveTo(this.shoulderX, this.shoulderY);
+              if (this.armX !== this.handX || this.armY !== this.handY) {
+                context.lineTo(this.armX, this.armY);
+              }
+              context.lineTo(this.handX, this.handY);
+              context.stroke();
+            } else if (this.armDetected) {
               // Draw line connecting shoulder and arm
               context.strokeStyle = '#ffffff';
               context.lineWidth = 2;
@@ -1691,37 +1916,54 @@
               context.moveTo(this.shoulderX, this.shoulderY);
               context.lineTo(this.armX, this.armY);
               context.stroke();
+            } else if (this.handDetected) {
+              // Draw line connecting shoulder and hand
+              context.strokeStyle = '#ffffff';
+              context.lineWidth = 2;
+              context.beginPath();
+              context.moveTo(this.shoulderX, this.shoulderY);
+              context.lineTo(this.handX, this.handY);
+              context.stroke();
             }
           }
           
-          // Track vertical movement of shoulder for rep counting
-          if (this.previousShoulderY !== null) {
+          // Track vertical movement of hand for rep counting
+          if (this.handDetected && this.previousHandY !== null) {
+            // Add current hand position to movement history for smoothing
+            this.movementHistory.push(this.handY);
+            if (this.movementHistory.length > this.historySize) {
+              this.movementHistory.shift();
+            }
+            
+            // Calculate smoothed hand position
+            const smoothedHandY = this.movementHistory.reduce((sum, val) => sum + val, 0) / this.movementHistory.length;
+            
             // Initialize calibration values if not set
             if (!this.calibrated) {
-              this.lowestShoulderY = this.shoulderY;
-              this.highestShoulderY = this.shoulderY;
+              this.lowestHandY = smoothedHandY;
+              this.highestHandY = smoothedHandY;
               this.calibrated = true;
             }
             
-            // Update range of motion boundaries
-            if (this.shoulderY < this.highestShoulderY) {
-              this.highestShoulderY = this.shoulderY; // Higher position (lower Y value)
+            // Update range of motion boundaries with some dampening to avoid jitter
+            if (smoothedHandY < this.highestHandY - 5) {
+              this.highestHandY = smoothedHandY; // Higher position (lower Y value)
             }
-            if (this.shoulderY > this.lowestShoulderY) {
-              this.lowestShoulderY = this.shoulderY; // Lower position (higher Y value)
+            if (smoothedHandY > this.lowestHandY + 5) {
+              this.lowestHandY = smoothedHandY; // Lower position (higher Y value)
             }
             
             // Calculate total range of motion
-            const totalRange = this.lowestShoulderY - this.highestShoulderY;
+            const totalRange = this.lowestHandY - this.highestHandY;
             
             // Calculate current position as percentage of range
             let currentPosition = 0;
             if (totalRange > 0) {
-              currentPosition = (this.lowestShoulderY - this.shoulderY) / totalRange;
+              currentPosition = (this.lowestHandY - smoothedHandY) / totalRange;
             }
             
             // State machine for rep detection with range of motion threshold
-            const deltaY = this.shoulderY - this.previousShoulderY;
+            const deltaY = smoothedHandY - this.previousHandY;
             
             if (deltaY < -this.movementThreshold && this.movementState !== 'up') {
               // Moving up
@@ -1742,19 +1984,24 @@
               this.movementState = 'idle';
             }
             
+            // Update previous hand position for next frame
+            this.previousHandY = smoothedHandY;
+            
             // Draw ROM indicator if detection overlay is enabled
             if (showDetection) {
-              // Draw range of motion percentage
+              // Draw movement state
               context.font = '16px Montserrat';
               context.fillStyle = 'white';
-              context.fillText(`ROM: ${Math.round(currentPosition * 100)}%`, 40, 75);
-              context.fillText(`Threshold: ${Math.round(this.rangeOfMotionThreshold * 100)}%`, 40, 100);
+              context.fillText(`State: ${this.movementState}`, 40, 50);
+              context.fillText(`Hand Y: ${Math.round(smoothedHandY)}`, 40, 75);
+              context.fillText(`ROM: ${Math.round(currentPosition * 100)}%`, 40, 100);
+              context.fillText(`Threshold: ${Math.round(this.rangeOfMotionThreshold * 100)}%`, 40, 125);
               
               // Draw ROM bar
               const barWidth = 150;
               const barHeight = 15;
               const barX = 40;
-              const barY = 110;
+              const barY = 135;
               
               // Background bar
               context.fillStyle = 'rgba(255, 255, 255, 0.2)';
@@ -1765,15 +2012,23 @@
                                 'rgba(46, 196, 182, 0.8)' : 'rgba(231, 29, 54, 0.8)';
               context.fillRect(barX, barY, barWidth * currentPosition, barHeight);
               
-              // Threshold marker
+              // Draw threshold marker
               context.fillStyle = 'rgba(255, 255, 255, 0.8)';
               context.fillRect(barX + (barWidth * this.rangeOfMotionThreshold) - 1, barY - 5, 2, barHeight + 10);
             }
+          } else if (this.handDetected) {
+            // First detection of hand, initialize tracking
+            this.previousHandY = this.handY;
+            this.movementHistory = Array(this.historySize).fill(this.handY);
           }
-          
-          this.previousShoulderY = this.shoulderY;
+              
+            }
+          }
         } else {
-          this.previousShoulderY = null;
+          // No contours detected, reset tracking
+          this.previousHandY = null;
+          this.handDetected = false;
+          this.armDetected = false;
         }
         
         // Draw movement state indicator if detection overlay is enabled
@@ -1787,8 +2042,8 @@
           context.font = '16px Montserrat';
           context.fillStyle = 'white';
           context.fillText(`State: ${this.movementState}`, 40, 25);
-          if (this.previousShoulderY !== null) {
-            context.fillText(`Y-Pos: ${Math.round(this.shoulderY)}`, 40, 50);
+          if (this.handDetected) {
+            context.fillText(`Hand Y: ${Math.round(this.handY)}`, 150, 25);
           }
         }
         
