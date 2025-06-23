@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="format-detection" content="telephone=no">
   <title>Lax Counter</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -422,6 +426,33 @@
       font-weight: 600;
       color: white;
       text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+    
+    /* Camera flip button */
+    #camera-flip {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 1.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 100;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      transition: var(--transition);
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    #camera-flip:active {
+      transform: scale(0.95);
+      background-color: var(--secondary);
     }
 
     /* Charts */
@@ -924,6 +955,13 @@
         padding: 0.6rem 1rem;
         font-size: 0.85rem;
         min-height: 44px; /* Apple's recommended minimum touch target size */
+        min-width: 44px; /* Ensure minimum touch target width */
+      }
+      
+      .btn-icon {
+        width: 50px; /* Larger touch target for mobile */
+        height: 50px; /* Larger touch target for mobile */
+        font-size: 1.5rem;
       }
 
       .settings-panel {
@@ -935,13 +973,42 @@
       
       .video-container {
         height: auto;
-        max-height: 70vh;
+        max-height: 80vh;
+        margin-bottom: 1rem;
+      }
+      
+      .video-overlay {
+        top: 1rem;
+        right: 1rem;
+        gap: 0.75rem;
+      }
+      
+      .video-controls {
+        padding: 1rem;
+      }
+      
+      .rep-counter {
+        font-size: 2.5rem;
+      }
+      
+      .timer {
+        font-size: 1.2rem;
       }
       
       .controls {
         flex-wrap: wrap;
         justify-content: center;
         gap: 0.5rem;
+      }
+      
+      /* Improve mobile menu visibility */
+      .menu-toggle {
+        width: 60px;
+        height: 60px;
+        font-size: 1.8rem;
+        bottom: 30px;
+        right: 30px;
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
       }
       
       .stat-value {
@@ -1194,7 +1261,7 @@
           <button class="btn btn-outline btn-icon" id="toggle-detection">👁️</button>
           <button class="btn btn-danger btn-icon" id="reset-counter">🔄</button>
           <!-- Camera flip button (only visible on mobile) -->
-          <button class="btn btn-primary btn-icon" id="camera-flip" style="display: none;">📱</button>
+          <button class="btn btn-primary btn-icon" id="camera-flip">📱</button>
         </div>
         
         <div class="video-controls">
@@ -2157,34 +2224,82 @@
       try {
         // Check if this is a mobile device
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        
+        console.log('Device detection:', { isMobile, isIOS, isAndroid, userAgent: navigator.userAgent });
         
         // Adjust constraints based on device type
         const constraints = {
+          audio: false,
           video: {
-            width: { ideal: isMobile ? 720 : 1280 },
+            width: { ideal: isMobile ? 640 : 1280 },
             height: { ideal: isMobile ? 480 : 720 },
             facingMode: 'user'
           }
         };
         
-        // For iOS Safari, we need to handle orientation changes
+        // iOS-specific adjustments
+        if (isIOS) {
+          // iOS sometimes works better with more flexible constraints
+          constraints.video.width = { min: 320, ideal: 640, max: 1280 };
+          constraints.video.height = { min: 240, ideal: 480, max: 720 };
+          
+          // Ensure video element is properly sized and visible
+          video.style.width = '100%';
+          video.style.height = 'auto';
+          video.style.objectFit = 'contain';
+          video.setAttribute('playsinline', true); // Critical for iOS inline video
+          video.setAttribute('autoplay', true);
+          video.setAttribute('muted', true);
+        }
+        
+        // For mobile devices, especially iOS, we need to handle orientation changes
         const handleOrientationChange = () => {
+          console.log('Orientation/resize event detected');
           setTimeout(() => {
             if (video.videoWidth > 0) {
               canvas.width = video.videoWidth;
               canvas.height = video.videoHeight;
+              console.log('Canvas resized to:', { width: canvas.width, height: canvas.height });
+              
+              // Force redraw of UI elements
+              if (isIOS) {
+                // This can help with iOS rendering issues
+                video.style.display = 'none';
+                setTimeout(() => { video.style.display = 'block'; }, 50);
+              }
+            } else {
+              console.warn('Video dimensions not available during resize');
             }
-          }, 300); // Small delay to allow video dimensions to update
+          }, 800); // Increased delay to allow video dimensions to update on iOS
         };
         
         window.addEventListener('orientationchange', handleOrientationChange);
+        window.addEventListener('resize', handleOrientationChange);
         
         // Get camera stream
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('Requesting camera with constraints:', constraints);
+        let stream;
+        
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          console.log('Camera access granted with primary constraints');
+        } catch (err) {
+          console.warn('Failed with primary constraints:', err);
+          
+          // Fallback to simpler constraints
+          console.log('Trying fallback constraints...');
+          const fallbackConstraints = { video: true, audio: false };
+          stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          console.log('Camera access granted with fallback constraints');
+        }
+        
         video.srcObject = stream;
         
         return new Promise((resolve) => {
           video.onloadedmetadata = () => {
+            console.log('Video metadata loaded:', { width: video.videoWidth, height: video.videoHeight });
             // Set canvas dimensions to match video
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -2198,6 +2313,8 @@
               
               // Set initial icon based on current camera
               cameraFlipBtn.innerHTML = constraints.video.facingMode === 'user' ? '📱' : '🤳';
+              
+              console.log('Camera flip button enabled for mobile device');
               
               // Add click event listener
               cameraFlipBtn.addEventListener('click', async () => {
@@ -2662,6 +2779,51 @@
       loader.style.display = 'flex';
       
       try {
+        // Check if this is a mobile device
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
+        console.log('Initializing app for device:', { isMobile, isIOS });
+        
+        // Apply mobile-specific adjustments
+        if (isMobile) {
+          // Force landscape orientation for better experience
+          if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+            try {
+              await window.screen.orientation.lock('landscape');
+              console.log('Locked to landscape orientation');
+            } catch (e) {
+              console.log('Could not lock orientation:', e);
+              // Show orientation guidance for mobile users
+              const loaderMessage = document.querySelector('.loader-message');
+              if (loaderMessage) {
+                loaderMessage.textContent = 'For best experience, please use landscape orientation';
+              }
+            }
+          }
+          
+          // iOS-specific adjustments
+          if (isIOS) {
+            // Add iOS viewport fix
+            const viewportMeta = document.querySelector('meta[name="viewport"]');
+            if (viewportMeta) {
+              viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            }
+            
+            // Add fullscreen guidance for iOS
+            const iosGuidance = document.createElement('div');
+            iosGuidance.className = 'ios-guidance';
+            iosGuidance.innerHTML = 'For best experience, tap <b>Share</b> and <b>Add to Home Screen</b>, then open from there.';
+            iosGuidance.style.cssText = 'position:fixed; top:0; left:0; right:0; background:rgba(231, 29, 54, 0.9); color:white; padding:10px; text-align:center; z-index:9999; font-size:14px;';
+            document.body.appendChild(iosGuidance);
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+              iosGuidance.style.display = 'none';
+            }, 10000);
+          }
+        }
+        
         // Setup camera
         await setupCamera();
         
@@ -2682,9 +2844,41 @@
         
         // Hide loader
         loader.style.display = 'none';
+        
+        // Add a tap event to ensure proper initialization on iOS
+        if (isIOS) {
+          const tapToStart = document.createElement('div');
+          tapToStart.className = 'tap-to-start';
+          tapToStart.innerHTML = 'Tap anywhere to start camera';
+          tapToStart.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(67, 97, 238, 0.9); color:white; padding:20px; border-radius:10px; text-align:center; z-index:9998; font-size:18px;';
+          document.body.appendChild(tapToStart);
+          
+          const handleTap = () => {
+            tapToStart.style.display = 'none';
+            document.removeEventListener('click', handleTap);
+            document.removeEventListener('touchend', handleTap);
+          };
+          
+          document.addEventListener('click', handleTap);
+          document.addEventListener('touchend', handleTap);
+        }
       } catch (error) {
         console.error('Error initializing app:', error);
-        alert('Error initializing the application. Please refresh and try again.');
+        const errorMessage = `Error initializing the application: ${error.message}. Please refresh and try again.`;
+        alert(errorMessage);
+        
+        // Update loader to show error
+        const loaderText = document.querySelector('.loader-text');
+        if (loaderText) {
+          loaderText.textContent = 'Initialization Failed';
+          loaderText.style.color = 'var(--danger)';
+        }
+        
+        const loaderMessage = document.querySelector('.loader-message');
+        if (loaderMessage) {
+          loaderMessage.innerHTML = `Error: ${error.message}<br>Please refresh the page or try a different browser.`;
+          loaderMessage.style.color = 'var(--danger)';
+        }
       }
     }
     
