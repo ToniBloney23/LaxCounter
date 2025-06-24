@@ -486,6 +486,27 @@
         main();
     }
 
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        const timerContainer = document.getElementById('timer-container');
+        timerInterval = setInterval(() => {
+            seconds++;
+            let minutes = Math.floor(seconds / 60);
+            let remainingSeconds = seconds % 60;
+            timerContainer.textContent = `Time: ${minutes}m ${remainingSeconds}s`;
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+    }
+
+    function resetTimer() {
+        stopTimer();
+        seconds = 0;
+        document.getElementById('timer-container').textContent = 'Time: 0s';
+    }
+
     async function main() {
         await setupCamera();
         const tracker = new ArmSleeveTracker();
@@ -497,35 +518,6 @@
                 tracker.detect(ctx, video);
             }
             requestAnimationFrame(gameLoop);
-        }
-
-        function startTimer() {
-            if (timerInterval) clearInterval(timerInterval);
-            const timerContainer = document.getElementById('timer-container');
-            timerInterval = setInterval(() => {
-                seconds++;
-                let minutes = Math.floor(seconds / 60);
-                let remainingSeconds = seconds % 60;
-                timerContainer.textContent = `Time: ${minutes}m ${remainingSeconds}s`;
-            }, 1000);
-        }
-
-        function stopTimer() {
-            clearInterval(timerInterval);
-        }
-
-        resetButton.addEventListener('click', () => {
-            reps = 0;
-            repTimestamps = [];
-            repsDisplay.textContent = 'Reps: 0';
-            resetTimer();
-        });
-        }
-
-        function resetTimer() {
-            stopTimer();
-            seconds = 0;
-            document.getElementById('timer-container').textContent = 'Time: 0s';
         }
 
         gameLoop();
