@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lacrosse Wall Ball Tracker - Arm Movement</title>
+    <title>Brick Wall Ball Counter</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Roboto Mono', monospace;
-            background-color: #121212;
+            background-color: #1a1a1a; /* Darker background */
             color: #e0e0e0;
             display: flex;
             flex-direction: column;
@@ -26,7 +26,7 @@
             aspect-ratio: 16 / 9;
             border-radius: 15px;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
             background: #000;
         }
 
@@ -37,7 +37,6 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1);
         }
 
         #ui-container {
@@ -55,7 +54,7 @@
         }
 
         #counter-container {
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(20, 20, 20, 0.7);
             backdrop-filter: blur(10px);
             padding: 10px 25px;
             border-radius: 50px;
@@ -66,7 +65,7 @@
         #counter-container h1 {
             margin: 0;
             font-size: 1.2em;
-            color: #ff416c;
+            color: #e67e22; /* Brick color */
             text-transform: uppercase;
             letter-spacing: 2px;
         }
@@ -79,17 +78,17 @@
         }
 
         #controls {
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(20, 20, 20, 0.7);
             backdrop-filter: blur(10px);
             padding: 20px;
             border-radius: 15px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             text-align: center;
-            max-width: 300px;
+            max-width: 350px;
         }
 
         #startButton {
-            background: linear-gradient(to right, #ff416c, #ff4b2b);
+            background: linear-gradient(to right, #d35400, #e67e22);
             color: white;
             border: none;
             padding: 15px 30px;
@@ -107,7 +106,7 @@
 
         #startButton:not(:disabled):hover {
             transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(255, 65, 108, 0.4);
+            box-shadow: 0 5px 15px rgba(230, 126, 34, 0.4);
         }
 
         #loader {
@@ -116,7 +115,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             border: 8px solid #f3f3f3;
-            border-top: 8px solid #ff416c;
+            border-top: 8px solid #e67e22;
             border-radius: 50%;
             width: 60px;
             height: 60px;
@@ -142,7 +141,7 @@
         <div id="loader"></div>
         <div id="ui-container">
             <div id="counter-container">
-                <h1>Reps</h1>
+                <h1>Hits</h1>
                 <p id="counter">0</p>
             </div>
             <div id="controls">
@@ -152,13 +151,10 @@
         </div>
     </div>
 
-    <!-- TensorFlow.js Core -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@3.11.0/dist/tf-core.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@3.11.0/dist/tf-converter.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@3.11.0/dist/tf-backend-webgl.min.js"></script>
-
-    <!-- Pose Detection model -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.0.0/dist/pose-detection.min.js"></script>
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <!-- COCO-SSD model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
 
     <script>
         const video = document.getElementById('video');
@@ -170,22 +166,23 @@
         const controls = document.getElementById('controls');
         const instructions = document.getElementById('instructions');
 
-        let detector = null;
+        let model = null;
         let repCount = 0;
-        let armState = 'down'; // 'down' or 'up'
+        let lastWallHitTime = 0;
         let isDetecting = false;
 
         // --- Main Setup ---
         async function setup() {
             loader.style.display = 'block';
-            instructions.innerHTML = '<p><strong>Loading Model...</strong></p><p>Please wait, this may take a moment.</p>';
-            const detectorConfig = {modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING};
-            detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, detectorConfig);
-            console.log('Pose detection model loaded.');
-            loader.style.display = 'none';
-            startButton.disabled = false;
-            startButton.textContent = 'Start Camera';
-            instructions.innerHTML = '<p><strong>Arm Movement Tracker</strong></p><p>Press Start and position yourself in the frame. Reps are counted when you raise and lower your arm.</p>';
+            instructions.innerHTML = '<p><strong>Loading Model...</strong></p><p>Please wait a moment.</p>';
+            await cocoSsd.load().then(loadedModel => {
+                model = loadedModel;
+                console.log('Object detection model loaded.');
+                loader.style.display = 'none';
+                startButton.disabled = false;
+                startButton.textContent = 'Start Camera';
+                instructions.innerHTML = '<p><strong>Brick Wall Counter</strong></p><p>Press Start and aim the camera. A hit is counted when the ball enters the wall zone (right side).</p>';
+            });
 
             startButton.addEventListener('click', async () => {
                 if (!isDetecting) {
@@ -203,7 +200,7 @@
 
         async function setupCamera() {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user' }, // Use 'environment' for back camera
+                video: { facingMode: 'environment' }, // Use 'user' for front camera
                 audio: false
             });
             video.srcObject = stream;
@@ -215,65 +212,58 @@
         }
 
         async function detectFrame() {
-            if (!detector) {
-                requestAnimationFrame(detectFrame);
+            if (!model || !isDetecting) {
                 return;
             }
 
-            const poses = await detector.estimatePoses(video);
+            const predictions = await model.detect(video);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            if (poses && poses.length > 0) {
-                const keypoints = poses[0].keypoints;
-                drawPose(keypoints);
-                checkForRep(keypoints);
-            }
+            // Define the wall zone
+            const wallZoneStart = canvas.width * 0.8;
+            ctx.strokeStyle = 'rgba(230, 126, 34, 0.7)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(wallZoneStart, 0);
+            ctx.lineTo(wallZoneStart, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            const ball = predictions.find(p => p.class === 'sports ball');
+
+            if (ball) {
+                // Draw bounding box
+                ctx.strokeStyle = '#2ecc71';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(ball.bbox[0], ball.bbox[1], ball.bbox[2], ball.bbox[3]);
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillText(`${ball.class} (${Math.round(ball.score * 100)}%)`, ball.bbox[0], ball.bbox[1] > 10 ? ball.bbox[1] - 5 : 10);
+
+                const ballCenterX = ball.bbox[0] + ball.bbox[2] / 2;
+                checkForHit(ballCenterX);
+            } 
 
             requestAnimationFrame(detectFrame);
         }
 
-        function drawPose(keypoints) {
-            // Draw keypoints
-            for (const keypoint of keypoints) {
-                if (keypoint.score > 0.5) {
-                    ctx.fillStyle = '#ff416c';
-                    ctx.beginPath();
-                    ctx.arc(keypoint.x, keypoint.y, 5, 0, 2 * Math.PI);
-                    ctx.fill();
-                }
-            }
-            // Draw skeleton
-            const adjacentPairs = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            for (const [i, j] of adjacentPairs) {
-                const kp1 = keypoints[i];
-                const kp2 = keypoints[j];
-                if (kp1.score > 0.5 && kp2.score > 0.5) {
-                    ctx.beginPath();
-                    ctx.moveTo(kp1.x, kp1.y);
-                    ctx.lineTo(kp2.x, kp2.y);
-                    ctx.stroke();
-                }
-            }
-        }
+        function checkForHit(ballX) {
+            const now = Date.now();
+            const wallZoneStart = canvas.width * 0.8;
+            const cooldown = 1500; // 1.5 seconds
 
-        function checkForRep(keypoints) {
-            const rightShoulder = keypoints.find(k => k.name === 'right_shoulder');
-            const rightWrist = keypoints.find(k => k.name === 'right_wrist');
-
-            if (rightShoulder && rightWrist && rightShoulder.score > 0.5 && rightWrist.score > 0.5) {
-                // Simple bicep curl logic: check if wrist is above shoulder
-                if (armState === 'down' && rightWrist.y < rightShoulder.y) {
-                    armState = 'up';
-                }
-
-                if (armState === 'up' && rightWrist.y > rightShoulder.y) {
-                    repCount++;
-                    counterElement.textContent = repCount;
-                    armState = 'down';
-                    console.log(`Rep counted! Total: ${repCount}`);
-                }
+            if (ballX > wallZoneStart && now - lastWallHitTime > cooldown) {
+                repCount++;
+                counterElement.textContent = repCount;
+                lastWallHitTime = now;
+                console.log(`Hit counted! Total: ${repCount}`);
+                // Visual feedback for hit
+                document.getElementById('counter-container').style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    document.getElementById('counter-container').style.transform = 'scale(1)';
+                }, 200);
             }
         }
 
