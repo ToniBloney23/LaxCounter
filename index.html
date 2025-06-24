@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#232526">
   <meta name="format-detection" content="telephone=no">
@@ -11,6 +12,45 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    // Global variables
+    let openCvReady = false;
+    let domReady = false;
+
+    // Called when OpenCV.js is ready
+    function onOpenCvReady() {
+      console.log('onOpenCvReady called.');
+      openCvReady = true;
+      console.log('OpenCV.js is ready');
+      // Since the loader is in the body, we can't update it here yet.
+      // We'll handle the loader in tryInitApp.
+      tryInitApp();
+    }
+
+    // Tries to initialize the app, called when either DOM or OpenCV is ready
+    function tryInitApp() {
+      console.log(`tryInitApp called. domReady: ${domReady}, openCvReady: ${openCvReady}`);
+      if (domReady && openCvReady) {
+        console.log('Both DOM and OpenCV are ready. Calling main().');
+        // Now that the DOM is ready, we can access the loader.
+        updateLoaderProgress(100, 'OpenCV.js loaded successfully');
+        main().catch(err => {
+          console.error('Initialization failed:', err);
+          document.getElementById('reps').textContent = 'Error: ' + err.message;
+        }).finally(() => {
+          // Hide loader regardless of success or failure
+          console.log('Hiding loader.');
+          setTimeout(() => {
+            const loader = document.getElementById('loader');
+            if(loader) {
+                loader.style.opacity = '0';
+                loader.style.visibility = 'hidden';
+            }
+          }, 500); // Give a moment for canvas to render
+        });
+      }
+    }
+  </script>
   <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
 
   <style>
@@ -841,6 +881,7 @@
 
     // Called when OpenCV.js is ready
     function onOpenCvReady() {
+      console.log('onOpenCvReady called.');
       openCvReady = true;
       console.log('OpenCV.js is ready');
       updateLoaderProgress(100, 'OpenCV.js loaded successfully');
@@ -849,12 +890,15 @@
 
     // Tries to initialize the app, called when either DOM or OpenCV is ready
     function tryInitApp() {
+      console.log(`tryInitApp called. domReady: ${domReady}, openCvReady: ${openCvReady}`);
       if (domReady && openCvReady) {
+        console.log('Both DOM and OpenCV are ready. Calling main().');
         main().catch(err => {
           console.error('Initialization failed:', err);
           document.getElementById('reps').textContent = 'Error: ' + err.message;
         }).finally(() => {
           // Hide loader regardless of success or failure
+          console.log('Hiding loader.');
           setTimeout(() => {
             document.getElementById('loader').style.opacity = '0';
             document.getElementById('loader').style.visibility = 'hidden';
@@ -1529,6 +1573,7 @@
 
     // Main initialization function
     async function main() {
+      console.log('main() started.');
       try {
         // Setup camera
         const video = await setupCamera();
@@ -1552,10 +1597,12 @@
 
         // Start detection loop
         window.ballDetectionActive = true;
+        console.log('Starting detection loop.');
         detect(video, canvas);
 
         // Setup UI event listeners
         setupUI();
+        console.log('main() finished successfully.');
       } catch (error) {
         console.error('Camera setup failed:', error);
         
@@ -1929,6 +1976,7 @@
 
     // Window load event
     window.onload = function() {
+      console.log('window.onload called.');
       // Check browser compatibility
       const warnings = checkBrowserCompatibility();
       if (warnings.length > 0) {
