@@ -11,20 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
- <script
-  async
-  src="https://docs.opencv.org/4.8.0/opencv.js"
-  onload="onOpenCvReady();"
-  onerror="onOpenCvLoadError();"
-  type="text/javascript"
-   function onOpenCvLoadError() {
-  document.getElementById('loader').style.opacity = '1';
-  document.getElementById('loader').style.visibility = 'visible';
-  document.querySelector('.loader-text').textContent = 'Failed to load OpenCV.js';
-  document.querySelector('.loader-message').textContent =
-    'Check your internet connection or try refreshing the page. If the problem persists, try using a different network.';
-}
-></script>
+  <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
 
   <style>
     :root {
@@ -838,6 +825,7 @@
   <script>
     // Global variables
     let openCvReady = false;
+    let domReady = false;
     let ballTracker = null;
     let reps = 0;
     let ballState = 'waiting'; // waiting, ball_present, ball_away, ball_returned
@@ -856,16 +844,23 @@
       openCvReady = true;
       console.log('OpenCV.js is ready');
       updateLoaderProgress(100, 'OpenCV.js loaded successfully');
-      
-      if (ballTracker) {
-        ballTracker.initialize();
+      tryInitApp();
+    }
+
+    // Tries to initialize the app, called when either DOM or OpenCV is ready
+    function tryInitApp() {
+      if (domReady && openCvReady) {
+        main().catch(err => {
+          console.error('Initialization failed:', err);
+          document.getElementById('reps').textContent = 'Error: ' + err.message;
+        }).finally(() => {
+          // Hide loader regardless of success or failure
+          setTimeout(() => {
+            document.getElementById('loader').style.opacity = '0';
+            document.getElementById('loader').style.visibility = 'hidden';
+          }, 500); // Give a moment for canvas to render
+        });
       }
-      
-      // Hide loader after a short delay
-      setTimeout(() => {
-        document.getElementById('loader').style.opacity = '0';
-        document.getElementById('loader').style.visibility = 'hidden';
-      }, 500);
     }
 
     // Update loader progress
@@ -1941,13 +1936,8 @@
         alert('Compatibility Notice:\n\n• ' + warningMessage);
       }
       
-      // Initialize app
-      main().catch(err => {
-        console.error('Initialization failed:', err);
-        document.getElementById('reps').textContent = 'Error: ' + err.message;
-        document.getElementById('loader').style.opacity = '0';
-        document.getElementById('loader').style.visibility = 'hidden';
-      });
+      domReady = true;
+      tryInitApp();
     };
 
     // Handle double-tap on mobile to close sidebar
