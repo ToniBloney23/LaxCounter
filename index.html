@@ -165,6 +165,7 @@
         <div id="controls">
             <div id="instructions"></div>
             <button id="startButton" disabled>Loading Model...</button>
+                <button id="testButton">Test Hit</button>
         </div>
     </div>
 
@@ -182,6 +183,7 @@
         const loader = document.getElementById('loader');
         const controls = document.getElementById('controls');
         const instructions = document.getElementById('instructions');
+        const testButton = document.getElementById('testButton');
 
         let model = null;
         let repCount = 0;
@@ -208,6 +210,10 @@
                     detectFrame();
                     controls.style.display = 'none';
                 }
+            });
+
+            testButton.addEventListener('click', () => {
+                checkForHit(canvas.width); // Simulate a hit at the far right edge
             });
         }
 
