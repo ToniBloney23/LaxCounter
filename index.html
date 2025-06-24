@@ -1136,7 +1136,6 @@
       </div>
       <div class="loader-percentage" id="loader-percentage">0%</div>
       <div class="loader-message">Preparing your workout experience</div>
-      <button id="retry-loading" class="btn btn-primary" style="margin-top: 20px; display: none;">Retry Loading</button>
     </div>
   </div>
 
@@ -2924,41 +2923,13 @@
       }
     }
 
-    // Load OpenCV.js with progress tracking and fallback mechanism
+    // Simple OpenCV.js loading function
     function loadOpenCV() {
       return new Promise((resolve, reject) => {
         const progressBar = document.getElementById('loader-progress');
         const percentageText = document.getElementById('loader-percentage');
         const loaderText = document.querySelector('.loader-text');
         const loaderMessage = document.querySelector('.loader-message');
-        
-        // Define multiple CDN sources for fallback with more options
-        const openCVSources = [
-          // Try local file first if available (you'll need to download this file)
-          window.location.origin + '/opencv.js',
-          window.location.origin + '/lib/opencv.js',
-          window.location.origin + '/js/opencv.js',
-          // Then try CDN sources
-          'https://docs.opencv.org/4.5.5/opencv.js', // Try older versions first as they might be more stable
-          'https://docs.opencv.org/4.6.0/opencv.js',
-          'https://docs.opencv.org/4.7.0/opencv.js',
-          'https://docs.opencv.org/4.8.0/opencv.js',
-          'https://docs.opencv.org/4.9.0/opencv.js',
-          'https://cdn.jsdelivr.net/npm/opencv.js@1.2.1/opencv.min.js',
-          'https://unpkg.com/opencv.js@1.2.1/opencv.js',
-          'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.7.0-release.1/opencv.js',
-          'https://cdn.jsdelivr.net/npm/opencv-wasm@4.3.0-10/opencv.js',
-          // Additional fallbacks
-          'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.5.5-release.2/opencv.js',
-          'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.5.4-release.2/opencv.js'
-        ];
-        
-        // Log available sources for debugging
-        console.log('OpenCV sources to try:', openCVSources);
-        
-        let currentSourceIndex = 0;
-        let loadAttempts = 0;
-        const maxAttempts = 2; // Try each source up to 2 times
         
         // Check if OpenCV is already loaded
         if (typeof cv !== 'undefined') {
@@ -2968,289 +2939,67 @@
           return resolve();
         }
         
-        function tryLoadOpenCV() {
-          if (currentSourceIndex >= openCVSources.length) {
-            if (loadAttempts < maxAttempts) {
-              loadAttempts++;
-              currentSourceIndex = 0;
-              console.log(`Retrying all sources (attempt ${loadAttempts} of ${maxAttempts})`);
-              loaderMessage.textContent = `Retrying all sources (attempt ${loadAttempts} of ${maxAttempts})...`;
-              setTimeout(tryLoadOpenCV, 1000); // Wait a second before retrying
-              return;
-            }
-            
-            // If all XHR attempts failed, try direct script loading as a last resort
-            if (loadAttempts >= maxAttempts) {
-              loaderMessage.textContent = 'Trying alternative loading method...';
-              console.log('Trying direct script loading as last resort');
-              
-              // Try to load directly from a reliable CDN
-              const script = document.createElement('script');
-              script.src = 'https://docs.opencv.org/4.5.5/opencv.js'; // Use a stable version
-              script.async = true;
-              
-              script.onload = function() {
-                console.log('OpenCV.js loaded via direct script tag');
-                progressBar.style.width = '100%';
-                percentageText.textContent = '100%';
-                loaderText.textContent = 'Initializing OpenCV.js...';
-                
-                // Check if cv object exists and wait for initialization
-                if (typeof cv !== 'undefined') {
-                  if (cv.onRuntimeInitialized) {
-                    cv.onRuntimeInitialized = () => {
-                      console.log('OpenCV.js initialized successfully via direct script');
-                      resolve();
-                    };
-                  } else {
-                    console.log('OpenCV.js already initialized via direct script');
-                    resolve();
-                  }
-                } else {
-                  // If cv doesn't exist yet, wait a bit and check again
-                  let checkInterval = setInterval(() => {
-                    if (typeof cv !== 'undefined') {
-                      clearInterval(checkInterval);
-                      console.log('OpenCV.js initialized after waiting (direct script)');
-                      resolve();
-                    }
-                  }, 100);
-                  
-                  // Set a timeout to prevent infinite waiting
-                  setTimeout(() => {
-                    clearInterval(checkInterval);
-                    if (typeof cv === 'undefined') {
-                      loaderMessage.textContent = 'Failed to load OpenCV.js. Please check your internet connection and try again.';
-                      loaderText.textContent = 'Loading Failed';
-                      loaderText.style.color = 'var(--danger)';
-                      
-                      // Show retry button
-                      const retryButton = document.getElementById('retry-loading');
-                      if (retryButton) {
-                        retryButton.style.display = 'block';
-                        retryButton.onclick = () => {
-                          // Reset UI
-                          loaderText.textContent = 'Loading OpenCV.js...';
-                          loaderText.style.color = 'var(--light)';
-                          loaderMessage.textContent = 'Retrying download...';
-                          retryButton.style.display = 'none';
-                          
-                          // Reset counters and try again
-                          loadAttempts = 0;
-                          currentSourceIndex = 0;
-                          tryLoadOpenCV();
-                        };
-                      }
-                      
-                      // Don't reject the promise yet, allow retry
-                      // reject(new Error('Failed to load OpenCV.js via direct script tag'));
-                    }
-                  }, 15000); // Wait 15 seconds max
-                }
+        // Use a direct script tag to load OpenCV.js
+        const script = document.createElement('script');
+        script.src = 'https://docs.opencv.org/4.8.0/opencv.js';
+        script.async = true;
+        
+        // Set up onload handler
+        script.onload = function() {
+          console.log('OpenCV.js script loaded');
+          progressBar.style.width = '100%';
+          percentageText.textContent = '100%';
+          loaderText.textContent = 'Initializing OpenCV.js...';
+          loaderMessage.textContent = 'Almost there! Setting up the workout environment...';
+          
+          // Set up onRuntimeInitialized handler
+          if (typeof cv !== 'undefined') {
+            if (cv.onRuntimeInitialized) {
+              const originalOnRuntimeInitialized = cv.onRuntimeInitialized;
+              cv.onRuntimeInitialized = () => {
+                originalOnRuntimeInitialized?.();
+                console.log('OpenCV.js initialized successfully');
+                resolve();
               };
-              
-              script.onerror = function() {
-                loaderMessage.textContent = 'Failed to load OpenCV.js from all sources. Please check your internet connection and try again.';
+            } else {
+              console.log('OpenCV.js already initialized');
+              resolve();
+            }
+          } else {
+            // If cv doesn't exist yet, wait a bit and check again
+            let checkInterval = setInterval(() => {
+              if (typeof cv !== 'undefined') {
+                clearInterval(checkInterval);
+                console.log('OpenCV.js initialized after waiting');
+                resolve();
+              }
+            }, 100);
+            
+            // Set a timeout to prevent infinite waiting
+            setTimeout(() => {
+              clearInterval(checkInterval);
+              if (typeof cv === 'undefined') {
+                console.error('OpenCV.js failed to initialize');
+                loaderMessage.textContent = 'Failed to initialize OpenCV.js. Please refresh the page to try again.';
                 loaderText.textContent = 'Loading Failed';
                 loaderText.style.color = 'var(--danger)';
-                
-                // Show retry button
-                const retryButton = document.getElementById('retry-loading');
-                if (retryButton) {
-                  retryButton.style.display = 'block';
-                  retryButton.onclick = () => {
-                    // Reset UI
-                    loaderText.textContent = 'Loading OpenCV.js...';
-                    loaderText.style.color = 'var(--light)';
-                    loaderMessage.textContent = 'Retrying download...';
-                    retryButton.style.display = 'none';
-                    
-                    // Reset counters and try again
-                    loadAttempts = 0;
-                    currentSourceIndex = 0;
-                    tryLoadOpenCV();
-                  };
-                }
-                
-                // Don't reject the promise yet, allow retry
-                // reject(new Error('Failed to load OpenCV.js from all sources including direct script tag'));
-              };
-              
-              document.head.appendChild(script);
-              return;
-            }
-            
-            loaderMessage.textContent = 'Failed to load OpenCV.js from all sources. Please check your internet connection and try again.';
-            loaderText.textContent = 'Loading Failed';
-            loaderText.style.color = 'var(--danger)';
-            
-            // Show retry button
-            const retryButton = document.getElementById('retry-loading');
-            if (retryButton) {
-              retryButton.style.display = 'block';
-              retryButton.onclick = () => {
-                // Reset UI
-                loaderText.textContent = 'Loading OpenCV.js...';
-                loaderText.style.color = 'var(--light)';
-                loaderMessage.textContent = 'Retrying download...';
-                retryButton.style.display = 'none';
-                
-                // Reset counters and try again
-                loadAttempts = 0;
-                currentSourceIndex = 0;
-                tryLoadOpenCV();
-              };
-            }
-            
-            // Don't reject the promise yet, allow retry
-            // reject(new Error('Failed to load OpenCV.js from all sources'));
-            return;
+                reject(new Error('Failed to initialize OpenCV.js'));
+              }
+            }, 10000); // Wait 10 seconds max
           }
-          
-          const currentSource = openCVSources[currentSourceIndex];
-          loaderMessage.textContent = `Trying source ${currentSourceIndex + 1}/${openCVSources.length}`;
-          console.log(`Attempting to load OpenCV.js from: ${currentSource}`);
-          
-          // Reset progress indicators
-          progressBar.style.width = '0%';
-          percentageText.textContent = '0%';
-          
-          // First, we need to fetch the file to track progress
-          const xhr = new XMLHttpRequest();
-          xhr.open('GET', currentSource, true);
-          xhr.responseType = 'blob';
-          
-          // Set timeout for the request
-          xhr.timeout = 30000; // 30 seconds timeout - increased for slower connections
-          
-          // Log the attempt
-          console.log(`Fetching OpenCV.js from: ${currentSource} (attempt ${loadAttempts + 1}, source ${currentSourceIndex + 1}/${openCVSources.length})`);
-          loaderMessage.textContent = `Downloading from source ${currentSourceIndex + 1}/${openCVSources.length}...`;
-          
-          // Track loading progress
-          xhr.onprogress = (event) => {
-            if (event.lengthComputable) {
-              const percentComplete = Math.round((event.loaded / event.total) * 100);
-              progressBar.style.width = percentComplete + '%';
-              percentageText.textContent = percentComplete + '%';
-            }
-          };
-          
-          xhr.onload = function() {
-            if (this.status === 200) {
-              // Create a URL for the blob
-              const blob = new Blob([this.response], {type: 'application/javascript'});
-              const scriptURL = URL.createObjectURL(blob);
-              
-              // Now create and load the script
-              const script = document.createElement('script');
-              script.setAttribute('type', 'text/javascript');
-              script.setAttribute('src', scriptURL);
-              
-              // Set a timeout for script loading
-              const scriptLoadTimeout = setTimeout(() => {
-                console.error(`Script load timeout for source ${currentSourceIndex + 1}`);
-                URL.revokeObjectURL(scriptURL);
-                currentSourceIndex++;
-                tryLoadOpenCV(); // Try next source
-              }, 20000); // 20 seconds timeout for script loading
-              
-              script.onload = () => {
-                clearTimeout(scriptLoadTimeout);
-                console.log('OpenCV.js script loaded');
-                progressBar.style.width = '100%';
-                percentageText.textContent = '100%';
-                loaderText.textContent = 'Initializing OpenCV.js...';
-                loaderMessage.textContent = 'Almost there! Setting up the workout environment...';
-                
-                // Check if cv object exists and wait for initialization
-                if (typeof cv !== 'undefined') {
-                  if (cv.onRuntimeInitialized) {
-                    // If cv exists but not initialized yet
-                    const originalOnRuntimeInitialized = cv.onRuntimeInitialized;
-                    cv.onRuntimeInitialized = () => {
-                      originalOnRuntimeInitialized?.();
-                      console.log('OpenCV.js initialized successfully');
-                      // Clean up the URL object
-                      URL.revokeObjectURL(scriptURL);
-                      resolve();
-                    };
-                  } else {
-                    // If cv exists and is already initialized
-                    console.log('OpenCV.js already initialized');
-                    URL.revokeObjectURL(scriptURL);
-                    resolve();
-                  }
-                } else {
-                  // If cv doesn't exist yet, wait a bit and check again
-                  let checkInterval = setInterval(() => {
-                    if (typeof cv !== 'undefined') {
-                      clearInterval(checkInterval);
-                      
-                      if (cv.onRuntimeInitialized) {
-                        const originalOnRuntimeInitialized = cv.onRuntimeInitialized;
-                        cv.onRuntimeInitialized = () => {
-                          originalOnRuntimeInitialized?.();
-                          console.log('OpenCV.js initialized after waiting');
-                          URL.revokeObjectURL(scriptURL);
-                          resolve();
-                        };
-                      } else {
-                        console.log('OpenCV.js already initialized after waiting');
-                        URL.revokeObjectURL(scriptURL);
-                        resolve();
-                      }
-                    }
-                  }, 100);
-                  
-                  // Set a timeout to prevent infinite waiting
-                  setTimeout(() => {
-                    clearInterval(checkInterval);
-                    if (typeof cv === 'undefined') {
-                      console.error(`OpenCV object not found after loading from source ${currentSourceIndex + 1}`);
-                      URL.revokeObjectURL(scriptURL);
-                      currentSourceIndex++;
-                      tryLoadOpenCV(); // Try next source
-                    }
-                  }, 10000); // Wait 10 seconds max
-                }
-              };
-              
-              script.onerror = () => {
-                clearTimeout(scriptLoadTimeout);
-                console.error(`Failed to initialize OpenCV.js from source ${currentSourceIndex + 1}`);
-                URL.revokeObjectURL(scriptURL);
-                currentSourceIndex++;
-                tryLoadOpenCV(); // Try next source
-              };
-              
-              document.body.appendChild(script);
-            } else {
-              console.error(`Failed to load OpenCV.js from source ${currentSourceIndex + 1}: HTTP ${this.status}`);
-              currentSourceIndex++;
-              tryLoadOpenCV(); // Try next source
-            }
-          };
-          
-          xhr.onerror = (error) => {
-            console.error(`Network error loading OpenCV.js from source ${currentSourceIndex + 1}:`, error);
-            loaderMessage.textContent = `Network error with source ${currentSourceIndex + 1}. Trying next source...`;
-            currentSourceIndex++;
-            setTimeout(() => tryLoadOpenCV(), 1000); // Add a small delay before trying next source
-          };
-          
-          xhr.ontimeout = () => {
-            console.error(`Timeout loading OpenCV.js from source ${currentSourceIndex + 1}`);
-            loaderMessage.textContent = `Timeout with source ${currentSourceIndex + 1}. Trying next source...`;
-            currentSourceIndex++;
-            setTimeout(() => tryLoadOpenCV(), 1000); // Add a small delay before trying next source
-          };
-          
-          xhr.send();
-        }
+        };
         
-        // Start the loading process
-        tryLoadOpenCV();
+        // Set up error handler
+        script.onerror = function() {
+          console.error('Failed to load OpenCV.js');
+          loaderMessage.textContent = 'Failed to load OpenCV.js. Please check your internet connection and refresh the page.';
+          loaderText.textContent = 'Loading Failed';
+          loaderText.style.color = 'var(--danger)';
+          reject(new Error('Failed to load OpenCV.js'));
+        };
+        
+        // Add the script to the document
+        document.head.appendChild(script);
       });
     }
 
