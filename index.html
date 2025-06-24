@@ -293,6 +293,14 @@
         from { opacity: 0; transform: translate3d(0, -20px, 0); }
         to { opacity: 1; transform: translate3d(0, 0, 0); }
     }
+    .button-container {
+        margin-bottom: 1rem;
+    }
+    .slider-container {
+        margin: 1rem auto;
+        width: 80%;
+        max-width: 400px;
+    }
   </style>
 </head>
 <body>
@@ -304,10 +312,18 @@
       <div id="reps">Reps: 0</div>
       <div id="timer-container">Time: 0s</div>
     </div>
-    <button id="reset-button" class="control-button">Reset</button>
+    <div class="button-container">
+        <button id="save-button" class="control-button">Save</button>
+        <button id="reset-button" class="control-button">Reset</button>
+    </div>
     <canvas id="canvas"></canvas>
     <video id="video" autoplay playsinline muted style="display: none;"></video>
     <button id="focus-mode-button" class="control-button">Focus Mode</button>
+    <div class="slider-container">
+        <label for="sensitivity-slider">Sensitivity</label>
+        <input type="range" id="sensitivity-slider" min="500" max="5000" value="2000">
+        <span id="sensitivity-value">2000</span>
+    </div>
   </div>
 
   <div id="hamburger-menu" class="menu-closed">
@@ -361,6 +377,9 @@
     const repsDisplay = document.getElementById('reps');
     const repSound = document.getElementById('rep-sound');
     const loader = document.getElementById('loader');
+    const resetButton = document.getElementById('reset-button');
+    const sensitivitySlider = document.getElementById('sensitivity-slider');
+    const sensitivityValue = document.getElementById('sensitivity-value');
 
     let reps = 0;
     let repTimestamps = [];
@@ -374,7 +393,7 @@
         constructor() {
             this.sleeveState = 'down'; // down, up
             this.lastSleeveCenterY = null;
-            this.minContourArea = 2000; // Minimum area to be considered a sleeve
+            this.minContourArea = parseInt(sensitivitySlider.value, 10); // Minimum area to be considered a sleeve
         }
 
         detect(context, videoElement) {
@@ -498,6 +517,20 @@
 
         function stopTimer() {
             clearInterval(timerInterval);
+        }
+
+        sensitivitySlider.addEventListener('input', (e) => {
+            tracker.minContourArea = parseInt(e.target.value, 10);
+            sensitivityValue.textContent = e.target.value;
+        });
+        }
+
+        resetButton.addEventListener('click', () => {
+            reps = 0;
+            repTimestamps = [];
+            repsDisplay.textContent = 'Reps: 0';
+            resetTimer();
+        });
         }
 
         function resetTimer() {
