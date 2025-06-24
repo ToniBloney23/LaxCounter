@@ -5,26 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#1a1a2e">
+  <meta name="theme-color" content="#232526">
   <meta name="format-detection" content="telephone=no">
-  <title>Lax Counter</title>
+  <title>Lacrosse Ball Rep Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     :root {
-      --primary: #4361ee;
-      --secondary: #3a0ca3;
-      --accent: #4cc9f0;
-      --success: #2ec4b6;
-      --warning: #ff9f1c;
-      --danger: #e71d36;
-      --dark: #1a1a2e;
-      --light: #f8f9fa;
-      --gray: #6c757d;
-      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      --primary: #4CAF50;
+      --primary-dark: #388E3C;
+      --primary-light: #C8E6C9;
+      --accent: #2196F3;
+      --accent-dark: #1976D2;
+      --danger: #f44336;
+      --danger-dark: #d32f2f;
+      --dark: #232526;
+      --dark-lighter: #414345;
+      --light: #f0f0f0;
+      --gray: #ccc;
+      --transition: all 0.3s ease;
     }
 
     * {
@@ -34,3226 +36,1918 @@
     }
 
     body {
-      font-family: 'Montserrat', sans-serif;
-      background-color: var(--dark);
+      background: linear-gradient(to right, var(--dark), var(--dark-lighter));
       color: var(--light);
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
 
-    .app-container {
-      display: grid;
-      grid-template-columns: 280px 1fr;
-      min-height: 100vh;
-      position: relative;
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      padding: 1rem;
+      margin: 0 auto;
     }
 
-    /* Sidebar Styles */
-    .sidebar {
-      background-color: rgba(26, 26, 46, 0.95);
-      padding: 2rem 1.5rem;
+    h1 {
+      margin-bottom: 0.5rem;
+      font-size: 2.5rem;
+      color: var(--primary);
+      animation: fadeInDown 1s ease-out;
+    }
+
+    p {
+      margin-bottom: 1.5rem;
+      font-size: 1.1rem;
+      color: var(--gray);
+    }
+
+    /* Rep Counter Styles */
+    #reps-container {
+      font-size: 2.5rem;
+      margin-bottom: 1.5rem;
       display: flex;
       flex-direction: column;
-      border-right: 1px solid rgba(255, 255, 255, 0.1);
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      overflow-y: auto;
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
-      z-index: 100;
-      transition: var(--transition);
-    }
-
-    .sidebar-collapsed {
-      transform: translateX(-280px);
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      margin-bottom: 2.5rem;
-      gap: 0.75rem;
-    }
-
-    .logo-icon {
-      width: 2.5rem;
-      height: 2.5rem;
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
       justify-content: center;
-      color: white;
-      font-weight: bold;
-      font-size: 1.2rem;
-    }
-
-    .logo-text {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: white;
-    }
-
-    .nav-section {
-      margin-bottom: 2rem;
-    }
-
-    .nav-section-title {
-      text-transform: uppercase;
-      font-size: 0.75rem;
-      letter-spacing: 1px;
-      color: var(--gray);
-      margin-bottom: 1rem;
-      padding-left: 0.5rem;
-    }
-
-    .nav-item {
-      display: flex;
       align-items: center;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-      cursor: pointer;
-      transition: var(--transition);
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    .nav-item:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-      color: white;
-    }
-
-    .nav-item.active {
-      background-color: var(--primary);
-      color: white;
-    }
-
-    .nav-icon {
-      margin-right: 0.75rem;
-      font-size: 1.2rem;
-      width: 1.5rem;
-      text-align: center;
-    }
-
-    .user-profile {
-      margin-top: auto;
-      display: flex;
-      align-items: center;
-      padding: 1rem;
-      border-radius: 12px;
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-
-    .user-avatar {
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: 50%;
-      background-color: var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      margin-right: 0.75rem;
-    }
-
-    .user-info {
-      flex: 1;
-    }
-
-    .user-name {
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-
-    .user-status {
-      font-size: 0.75rem;
-      color: var(--gray);
-    }
-
-    /* Main Content Styles */
-    .main-content {
-      padding: 2rem;
-      position: relative;
-    }
-
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 2rem;
-    }
-
-    .menu-toggle {
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: 50%;
-      background-color: rgba(255, 255, 255, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .menu-toggle:hover {
-      background-color: rgba(255, 255, 255, 0.2);
-    }
-
-    .page-title {
-      font-size: 1.75rem;
-      font-weight: 700;
-      background: linear-gradient(to right, var(--primary), var(--accent));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      margin-bottom: 0.5rem;
-    }
-
-    .page-subtitle {
-      color: var(--gray);
-      font-size: 1rem;
-    }
-
-    .action-buttons {
-      display: flex;
       gap: 1rem;
-    }
-
-    .btn {
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      border: none;
-      font-family: inherit;
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: var(--transition);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-
-    .btn-primary {
-      background-color: var(--primary);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background-color: var(--secondary);
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(67, 97, 238, 0.3);
-    }
-
-    .btn-outline {
-      background-color: transparent;
-      color: var(--light);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .btn-outline:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-      transform: translateY(-2px);
-    }
-
-    .btn-danger {
-      background-color: var(--danger);
-      color: white;
-    }
-
-    .btn-danger:hover {
-      background-color: #c41c2e;
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(231, 29, 54, 0.3);
-    }
-
-    .btn-icon {
-      width: 2.5rem;
-      height: 2.5rem;
-      padding: 0;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-    }
-
-    /* Dashboard Grid */
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    .card {
-      background-color: rgba(26, 26, 46, 0.8);
-      border-radius: 16px;
+      background: rgba(44, 44, 44, 0.7);
       padding: 1.5rem;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-      transition: var(--transition);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      -webkit-backdrop-filter: blur(10px);
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
-    .card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-    }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1rem;
-    }
-
-    .card-title {
-      font-size: 1rem;
+    #reps {
+      font-size: 3rem;
       font-weight: 600;
-      color: var(--light);
-    }
-
-    .card-icon {
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-    }
-
-    .card-icon-primary {
-      background-color: rgba(67, 97, 238, 0.2);
       color: var(--primary);
     }
 
-    .card-icon-success {
-      background-color: rgba(46, 196, 182, 0.2);
-      color: var(--success);
+    #timer, #rpm {
+      font-size: 1.5rem;
+      color: var(--light);
     }
 
-    .card-icon-warning {
-      background-color: rgba(255, 159, 28, 0.2);
-      color: var(--warning);
+    /* Goal Container Styles */
+    #goal-container {
+      width: 100%;
+      max-width: 500px;
+      margin: 1rem auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      background: rgba(44, 44, 44, 0.7);
+      padding: 1.5rem;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
-    .card-icon-danger {
-      background-color: rgba(231, 29, 54, 0.2);
-      color: var(--danger);
-    }
-
-    .stat-value {
-      font-size: 2.5rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-
-    .stat-label {
-      font-size: 0.85rem;
-      color: var(--gray);
-    }
-
-    .stat-change {
+    #goal-controls {
       display: flex;
       align-items: center;
-      font-size: 0.85rem;
-      margin-top: 0.5rem;
-    }
-
-    .stat-change-positive {
-      color: var(--success);
-    }
-
-    .stat-change-negative {
-      color: var(--danger);
-    }
-
-    /* Video Container */
-    .video-container {
-      position: relative;
-      margin-bottom: 2rem;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
-    }
-
-    #video-canvas {
+      justify-content: center;
       width: 100%;
-      height: auto;
-      display: block;
-      background-color: #000;
+      gap: 15px;
     }
 
-    #video {
+    .goal-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #goal-input {
+      width: 80px;
+      text-align: center;
+      font-size: 1.2rem;
+      background: #333;
+      color: var(--light);
+      border: 1px solid #555;
+      border-radius: 8px;
+      padding: 8px;
+    }
+
+    .goal-adjust-button {
+      width: 36px;
+      height: 36px;
+      font-size: 1.5rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+
+    .goal-adjust-button:hover {
+      background: var(--primary-dark);
+    }
+
+    .goal-adjust-button:active {
+      transform: scale(0.95);
+    }
+
+    /* Progress Bar Styles */
+    #progress-bar-container {
+      width: 100%;
+      background-color: #555;
+      border-radius: 10px;
+      margin-top: 1rem;
+      overflow: hidden;
+    }
+
+    #progress-bar {
+      width: 0%;
+      height: 20px;
+      background-color: var(--primary);
+      border-radius: 10px;
+      transition: width 0.5s ease-in-out;
+    }
+
+    /* Button Styles */
+    .control-button, #reset-button, #view-toggle, #focus-mode-button {
+      font-size: 1rem;
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      transition: var(--transition);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 500;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      margin: 0.5rem;
+    }
+
+    .control-button {
+      background: var(--accent);
+    }
+
+    .control-button:hover {
+      background: var(--accent-dark);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .control-button:active {
+      transform: translateY(-1px);
+    }
+
+    #reset-button {
+      background: var(--danger);
+    }
+
+    #reset-button:hover {
+      background: var(--danger-dark);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    #controls-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    /* Video and Canvas Styles */
+    video {
       display: none;
     }
 
-    .video-overlay {
-      position: absolute;
-      top: 1.5rem;
-      right: 1.5rem;
-      display: flex;
-      gap: 1rem;
-      z-index: 10;
+    canvas {
+      max-width: 100%;
+      width: 100%;
+      height: auto;
+      border-radius: 15px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+      display: block;
+      margin: 1rem auto;
+      background-color: #000;
     }
 
-    .video-controls {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 1.5rem;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .rep-counter {
-      font-size: 3rem;
-      font-weight: 700;
-      color: white;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-    }
-
-    .timer {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: white;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-    }
-    
-    /* Camera flip button */
-    #camera-flip {
+    /* Menu Icon Styles */
+    #menu-icon {
       position: fixed;
-      bottom: 20px;
+      top: 20px;
       right: 20px;
-      width: 60px;
-      height: 60px;
-      background-color: var(--primary);
-      color: white;
-      border: none;
+      cursor: pointer;
+      z-index: 1001;
+      width: 40px;
+      height: 40px;
+      background: rgba(44, 44, 44, 0.7);
       border-radius: 50%;
-      font-size: 1.8rem;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      z-index: 100;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      gap: 5px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    #menu-icon div {
+      width: 25px;
+      height: 3px;
+      background-color: white;
+      border-radius: 3px;
       transition: var(--transition);
-      -webkit-tap-highlight-color: transparent;
-    }
-    
-    #camera-flip:active {
-      transform: scale(0.95);
-      background-color: var(--secondary);
     }
 
-    /* Charts */
-    .chart-container {
-      height: 300px;
-      margin-bottom: 1rem;
+    #menu-icon.open div:nth-child(1) {
+      transform: translateY(8px) rotate(45deg);
     }
 
-    /* Settings Panel */
-    .settings-panel {
+    #menu-icon.open div:nth-child(2) {
+      opacity: 0;
+    }
+
+    #menu-icon.open div:nth-child(3) {
+      transform: translateY(-8px) rotate(-45deg);
+    }
+
+    /* Navigation Drawer Styles */
+    #nav-drawer {
       position: fixed;
       top: 0;
-      right: 0;
-      width: 350px;
-      height: 100vh;
-      background-color: rgba(26, 26, 46, 0.95);
-      border-left: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 2rem;
-      z-index: 1000;
-      transform: translateX(100%);
+      right: -300px;
+      width: 280px;
+      height: 100%;
+      background-color: rgba(44, 44, 44, 0.95);
+      padding-top: 70px;
       transition: var(--transition);
-      overflow-y: auto;
-      -webkit-backdrop-filter: blur(10px);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
-    .settings-panel.open {
-      transform: translateX(0);
+    #nav-drawer.open {
+      right: 0;
     }
 
-    .settings-header {
+    #nav-drawer .control-button {
+      width: 80%;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    /* Toggle Switch Styles */
+    .toggle-switch-container {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 2rem;
-    }
-
-    .settings-title {
-      font-size: 1.5rem;
-      font-weight: 600;
-    }
-
-    .close-settings {
-      width: 2rem;
-      height: 2rem;
-      border-radius: 50%;
-      background-color: rgba(255, 255, 255, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .close-settings:hover {
-      background-color: rgba(255, 255, 255, 0.2);
-    }
-
-    .settings-section {
-      margin-bottom: 2rem;
-    }
-
-    .settings-section-title {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-      color: var(--light);
-    }
-
-    .form-group {
-      margin-bottom: 1.5rem;
-    }
-
-    .form-label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-size: 0.9rem;
-      color: var(--gray);
-    }
-
-    .form-control {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background-color: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      width: 80%;
+      margin: 15px 0;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
       border-radius: 8px;
-      color: var(--light);
-      font-family: inherit;
-      font-size: 0.9rem;
-      transition: var(--transition);
     }
 
-    .form-control:focus {
-      outline: none;
-      border-color: var(--primary);
-      background-color: rgba(255, 255, 255, 0.15);
-    }
-
-    .form-select {
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236c757d' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 1rem center;
-      background-size: 16px 12px;
-    }
-
-    .toggle-switch {
+    .switch {
       position: relative;
       display: inline-block;
-      width: 50px;
-      height: 24px;
+      width: 60px;
+      height: 34px;
     }
 
-    .toggle-switch input {
+    .switch input {
       opacity: 0;
       width: 0;
       height: 0;
     }
 
-    .toggle-slider {
+    .slider {
       position: absolute;
       cursor: pointer;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(255, 255, 255, 0.2);
+      background-color: #ccc;
       transition: var(--transition);
       border-radius: 34px;
     }
 
-    .toggle-slider:before {
+    .slider:before {
       position: absolute;
       content: "";
-      height: 18px;
-      width: 18px;
-      left: 3px;
-      bottom: 3px;
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
       background-color: white;
       transition: var(--transition);
       border-radius: 50%;
     }
 
-    input:checked + .toggle-slider {
+    input:checked + .slider {
       background-color: var(--primary);
     }
 
-    input:checked + .toggle-slider:before {
+    input:focus + .slider {
+      box-shadow: 0 0 1px var(--primary);
+    }
+
+    input:checked + .slider:before {
       transform: translateX(26px);
     }
 
-    .toggle-label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .toggle-text {
-      font-size: 0.9rem;
-    }
-
-    .range-slider {
+    /* Modal Styles */
+    .modal {
+      position: fixed;
+      z-index: 1100;
+      left: 0;
+      top: 0;
       width: 100%;
-      margin-top: 0.5rem;
-    }
-
-    .range-slider input {
-      width: 100%;
-      -webkit-appearance: none;
-      height: 6px;
-      border-radius: 3px;
-      background: rgba(255, 255, 255, 0.2);
-      outline: none;
-    }
-
-    .range-slider input::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--primary);
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .range-slider input::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--primary);
-      cursor: pointer;
-      transition: var(--transition);
-      border: none;
-    }
-
-    .range-slider input::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
-    }
-
-    .range-slider input::-moz-range-thumb:hover {
-      transform: scale(1.2);
-    }
-
-    .range-values {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--gray);
-      margin-top: 0.5rem;
-    }
-
-    /* Workout History */
-    .history-list {
-      margin-top: 1rem;
-    }
-
-    .history-item {
-      display: flex;
-      align-items: center;
-      padding: 1rem;
-      border-radius: 12px;
-      background-color: rgba(255, 255, 255, 0.05);
-      margin-bottom: 1rem;
-      transition: var(--transition);
-    }
-
-    .history-item:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .history-icon {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 12px;
-      background-color: rgba(67, 97, 238, 0.2);
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.7);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.5rem;
-      color: var(--primary);
-      margin-right: 1rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: var(--transition);
     }
 
-    .history-details {
-      flex: 1;
+    .modal.show {
+      opacity: 1;
+      visibility: visible;
     }
 
-    .history-title {
-      font-weight: 600;
-      margin-bottom: 0.25rem;
+    .modal-content {
+      background: #333;
+      padding: 25px;
+      border: none;
+      width: 90%;
+      max-width: 400px;
+      border-radius: 15px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      transform: scale(0.9);
+      transition: var(--transition);
     }
 
-    .history-meta {
-      display: flex;
-      gap: 1rem;
-      font-size: 0.85rem;
-      color: var(--gray);
+    .modal.show .modal-content {
+      transform: scale(1);
     }
 
-    .history-meta-item {
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
+    .close-button {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: var(--transition);
     }
 
-    .history-actions {
-      display: flex;
-      gap: 0.5rem;
+    .close-button:hover,
+    .close-button:focus {
+      color: white;
+      text-decoration: none;
     }
 
-    /* Loader */
-    #loader {
+    #login-modal input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      border: 1px solid #555;
+      background: #444;
+      color: var(--light);
+      font-family: inherit;
+    }
+
+    #leaderboard-list, #session-history-list {
+      list-style: none;
+      padding: 0;
+      margin-top: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    #leaderboard-list li, #session-history-list li {
+      background: #444;
+      margin-bottom: 10px;
+      padding: 15px;
+      border-radius: 8px;
+      transition: var(--transition);
+      text-align: left;
+    }
+
+    #leaderboard-list li:hover, #session-history-list li:hover {
+      background-color: #555;
+      transform: scale(1.02);
+    }
+
+    /* Notification Styles */
+    #notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: var(--primary);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      transform: translateX(150%);
+      transition: transform 0.3s ease;
+    }
+
+    #notification.show {
+      transform: translateX(0);
+    }
+
+    /* Camera Status Styles */
+    #camera-status {
+      margin: 1rem auto;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 8px;
+      max-width: 400px;
+    }
+
+    /* Focus View Styles */
+    .focus-view h1,
+    .focus-view p,
+    .focus-view #menu-icon,
+    .focus-view #save-button,
+    .focus-view #reset-button,
+    .focus-view canvas,
+    .focus-view #nav-drawer,
+    .focus-view #focus-mode-button,
+    .focus-view #goal-container {
+      display: none;
+    }
+
+    .focus-view #reps-container {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: linear-gradient(135deg, var(--dark), #121224);
-      display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
-      z-index: 9999;
+      align-items: center;
+      background: #000;
+      z-index: 2000;
+      border-radius: 0;
     }
-    
+
+    .focus-view #reps {
+      font-size: 25vw;
+      color: var(--primary);
+    }
+
+    .focus-view #timer, .focus-view #rpm {
+      font-size: 5vw;
+    }
+
+    .focus-view #exit-focus-mode {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 2001;
+      display: block;
+    }
+
+    /* Loader Styles */
+    #loader {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 9999;
+      background: var(--dark);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+
     .loader-content {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      max-width: 400px;
-      padding: 2rem;
-      background-color: rgba(26, 26, 46, 0.8);
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
-      animation: fadeIn 0.5s ease forwards;
-    }
-    
-    .loader-logo {
-      display: flex;
-      align-items: center;
-      margin-bottom: 2rem;
-      gap: 0.75rem;
-    }
-    
-    .loader-logo .logo-icon {
-      width: 3.5rem;
-      height: 3.5rem;
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-      font-size: 1.5rem;
-      box-shadow: 0 5px 15px rgba(67, 97, 238, 0.3);
-      animation: logoEntrance 0.6s ease forwards;
-    }
-    
-    .loader-logo .logo-text {
-      font-size: 1.75rem;
-      font-weight: 700;
-      background: linear-gradient(to right, var(--primary), var(--accent));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      animation: logoEntrance 0.6s 0.2s ease forwards;
-      opacity: 0; /* Start hidden for animation */
+      gap: 20px;
     }
 
     .loader-spinner {
       width: 60px;
       height: 60px;
-      border: 5px solid rgba(255, 255, 255, 0.1);
+      border: 5px solid rgba(76, 175, 80, 0.3);
       border-radius: 50%;
       border-top-color: var(--primary);
-      border-left-color: var(--accent);
-      animation: spin 1s ease-in-out infinite;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 0 20px rgba(76, 201, 240, 0.3);
+      animation: spin 1s linear infinite;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes logoEntrance {
-      0% { transform: scale(0.8); opacity: 0; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-    
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
 
     .loader-text {
-      font-size: 1.2rem;
+      font-size: 1.5rem;
       font-weight: 600;
-      color: var(--light);
-      margin-bottom: 1.5rem;
-      text-align: center;
+      color: var(--primary);
     }
-    
-    .loader-progress-container {
-      width: 100%;
+
+    .loader-progress {
+      width: 250px;
       height: 10px;
-      background-color: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.2);
       border-radius: 5px;
       overflow: hidden;
-      margin-bottom: 0.75rem;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+      margin-top: 10px;
     }
-    
-    .loader-progress-bar {
+
+    #loader-progress {
       height: 100%;
       width: 0%;
-      background: linear-gradient(to right, var(--primary), var(--accent));
-      border-radius: 5px;
+      background: var(--primary);
       transition: width 0.3s ease;
-      box-shadow: 0 0 10px rgba(76, 201, 240, 0.5);
     }
-    
-    .loader-percentage {
+
+    #loader-percentage {
+      margin-top: 5px;
       font-size: 1rem;
-      font-weight: 600;
       color: var(--light);
-      margin-bottom: 1.5rem;
     }
-    
+
     .loader-message {
       font-size: 0.9rem;
-      color: rgba(255, 255, 255, 0.7);
+      color: var(--gray);
       text-align: center;
-      font-style: italic;
-      animation: pulse 2s infinite ease-in-out;
-    }
-    
-    @keyframes pulse {
-      0% { opacity: 0.7; }
-      50% { opacity: 1; }
-      100% { opacity: 0.7; }
-    }
-
-    /* Responsive */
-    @media (max-width: 992px) {
-      .app-container {
-        grid-template-columns: 1fr;
-      }
-
-      .sidebar {
-        position: fixed;
-        left: 0;
-        top: 0;
-        width: 280px;
-        height: 100vh;
-        z-index: 1000;
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-        overflow-y: auto;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
-      }
-
-      .sidebar.open {
-        transform: translateX(0);
-      }
-      
-      /* Add overlay when sidebar is open */
-      .sidebar.open::after {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: -1;
-      }
-
-      .main-content {
-        padding: 1.5rem;
-      }
-
-      .dashboard-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      /* Improved menu toggle button */
-      .menu-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        background: var(--primary);
-        color: white;
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 1001;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-size: 1.5rem;
-      }
-      
-      .menu-toggle::before {
-        content: '☰';
-      }
-      
-      .menu-toggle.active {
-        transform: rotate(90deg);
-        background: var(--danger);
-      }
-    }
-
-    @media (max-width: 576px) {
-      .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-      }
-
-      .action-buttons {
-        width: 100%;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-      }
-      
-      .btn {
-        padding: 0.6rem 1rem;
-        font-size: 0.85rem;
-        min-height: 44px; /* Apple's recommended minimum touch target size */
-        min-width: 44px; /* Ensure minimum touch target width */
-      }
-      
-      .btn-icon {
-        width: 50px; /* Larger touch target for mobile */
-        height: 50px; /* Larger touch target for mobile */
-        font-size: 1.5rem;
-      }
-
-      .settings-panel {
-        width: 100%;
-        max-height: 80vh;
-        overflow-y: auto;
-        padding: 1rem;
-      }
-      
-      .video-container {
-        height: auto;
-        max-height: 80vh;
-        margin-bottom: 1rem;
-      }
-      
-      .video-overlay {
-        top: 1rem;
-        right: 1rem;
-        gap: 0.75rem;
-      }
-      
-      .video-controls {
-        padding: 1rem;
-      }
-      
-      .rep-counter {
-        font-size: 2.5rem;
-      }
-      
-      .timer {
-        font-size: 1.2rem;
-      }
-      
-      .controls {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.5rem;
-      }
-      
-      /* Improve mobile menu visibility */
-      .menu-toggle {
-        width: 60px;
-        height: 60px;
-        font-size: 1.8rem;
-        bottom: 30px;
-        right: 30px;
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
-      }
-      
-      .stat-value {
-        font-size: 1.75rem;
-      }
-      
-      .dashboard-grid .card {
-        padding: 1rem;
-      }
-      
-      canvas {
-        max-width: 100%;
-        height: auto;
-      }
-      
-      /* Mobile-specific improvements */
-      .form-control, select {
-        font-size: 16px; /* Prevent iOS zoom on focus */
-        height: 44px;
-      }
-      
-      input[type="range"] {
-        height: 44px;
-      }
-      
-      .toggle-switch {
-        min-height: 30px;
-      }
-      
-      /* Prevent pull-to-refresh */
-      html, body {
-        overscroll-behavior-y: contain;
-      }
-      
-      /* Camera flip button for mobile */
-      .camera-flip-btn {
-        position: absolute;
-        bottom: 10px;
-        right: 10px;
-        background: rgba(0, 0, 0, 0.5);
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 44px;
-        height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        z-index: 10;
-      }
-    }
-
-    /* Focus Mode */
-    .focus-mode .sidebar,
-    .focus-mode .header,
-    .focus-mode .dashboard-grid,
-    .focus-mode .settings-panel {
-      display: none;
-    }
-
-    .focus-mode .video-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      border-radius: 0;
-    }
-
-    .focus-mode #video-canvas {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .focus-mode .rep-counter {
-      font-size: 6rem;
-    }
-
-    .focus-mode .timer {
-      font-size: 2.5rem;
+      max-width: 80%;
     }
 
     /* Animations */
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    @keyframes slideUp {
-      from { transform: translateY(20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
+    /* Responsive Styles */
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2rem;
+      }
+
+      p {
+        font-size: 1rem;
+      }
+
+      #reps-container {
+        font-size: 2rem;
+        padding: 1rem;
+      }
+
+      #reps {
+        font-size: 2.5rem;
+      }
+
+      #timer, #rpm {
+        font-size: 1.2rem;
+      }
+
+      .control-button, #reset-button, #view-toggle, #focus-mode-button {
+        font-size: 0.9rem;
+        padding: 0.7rem 1.2rem;
+      }
+
+      .focus-view #reps {
+        font-size: 20vw;
+      }
+
+      .focus-view #timer, .focus-view #rpm {
+        font-size: 6vw;
+      }
     }
 
-    .fade-in {
-      animation: fadeIn 0.5s ease forwards;
-    }
+    @media (max-width: 480px) {
+      h1 {
+        font-size: 1.8rem;
+      }
 
-    .slide-up {
-      animation: slideUp 0.5s ease forwards;
-    }
+      p {
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+      }
 
-    /* Version */
-    .version {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      font-size: 0.75rem;
-      color: rgba(255, 255, 255, 0.3);
-      z-index: 10;
+      #reps-container {
+        font-size: 1.8rem;
+        padding: 0.8rem;
+      }
+
+      #reps {
+        font-size: 2.2rem;
+      }
+
+      #timer, #rpm {
+        font-size: 1rem;
+      }
+
+      .control-button, #reset-button, #view-toggle, #focus-mode-button {
+        font-size: 0.8rem;
+        padding: 0.6rem 1rem;
+        margin: 0.3rem;
+      }
+
+      #goal-controls {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .goal-input-wrapper {
+        width: 100%;
+        justify-content: center;
+      }
+
+      #nav-drawer {
+        width: 100%;
+        right: -100%;
+      }
+
+      .focus-view #reps {
+        font-size: 18vw;
+      }
+
+      .focus-view #timer, .focus-view #rpm {
+        font-size: 7vw;
+      }
     }
   </style>
 </head>
 <body>
-  <!-- Loader -->
   <div id="loader">
     <div class="loader-content">
-      <div class="loader-logo">
-        <div class="logo-icon">LC</div>
-        <div class="logo-text">Lax Counter</div>
-      </div>
       <div class="loader-spinner"></div>
       <div class="loader-text">Loading OpenCV.js...</div>
-      <div class="loader-progress-container">
-        <div class="loader-progress-bar" id="loader-progress"></div>
+      <div class="loader-progress">
+        <div id="loader-progress"></div>
       </div>
-      <div class="loader-percentage" id="loader-percentage">0%</div>
+      <div id="loader-percentage">0%</div>
       <div class="loader-message">Preparing your workout experience</div>
     </div>
   </div>
 
-  <div class="app-container">
-    <!-- Sidebar -->
-    <div class="sidebar">
-      <div class="logo">
-        <div class="logo-icon">LC</div>
-        <div class="logo-text">Lax Counter</div>
-      </div>
+  <div class="container">
+    <h1>Lacrosse Ball Rep Tracker</h1>
+    <p>Use your camera to track lacrosse ball movement and count reps automatically.</p>
 
-      <div class="nav-section">
-        <div class="nav-section-title">Main</div>
-        <div class="nav-item active" data-page="dashboard">
-          <div class="nav-icon">📊</div>
-          <div>Dashboard</div>
-        </div>
-        <div class="nav-item" data-page="workout">
-          <div class="nav-icon">🏋️</div>
-          <div>Workout</div>
-        </div>
-        <div class="nav-item" data-page="history">
-          <div class="nav-icon">📅</div>
-          <div>History</div>
-        </div>
-        <div class="nav-item" data-page="stats">
-          <div class="nav-icon">📈</div>
-          <div>Statistics</div>
-        </div>
-      </div>
-
-      <div class="nav-section">
-        <div class="nav-section-title">Settings</div>
-        <div class="nav-item" id="open-settings">
-          <div class="nav-icon">⚙️</div>
-          <div>Preferences</div>
-        </div>
-        <div class="nav-item">
-          <div class="nav-icon">❓</div>
-          <div>Help</div>
-        </div>
-      </div>
-
-      <div class="user-profile">
-        <div class="user-avatar">G</div>
-        <div class="user-info">
-          <div class="user-name">Guest User</div>
-          <div class="user-status">Free Plan</div>
-        </div>
+    <div id="reps-container">
+      <div id="reps">Reps: 0</div>
+      <div id="timer" style="display: none;">Time: 0s</div>
+      <div id="rpm" style="display: none;">RPM: 0</div>
+      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px;">
+        <button id="save-button" class="control-button">Save</button>
+        <button id="reset-button">Reset</button>
       </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="main-content">
-      <div class="header">
-        <div>
-          <h1 class="page-title">Motion Rep Counter</h1>
-          <p class="page-subtitle">Track your workout reps with precision</p>
-        </div>
-        <div class="action-buttons">
-          <button class="btn btn-outline" id="toggle-focus-mode">
-            <span class="btn-icon">👁️</span>
-            <span>Focus Mode</span>
-          </button>
-          <button class="btn btn-primary" id="start-workout">
-            <span class="btn-icon">▶️</span>
-            <span>Start Workout</span>
-          </button>
+    <div id="goal-container">
+      <div id="goal-controls">
+        <label for="goal-input">Goal:</label>
+        <div class="goal-input-wrapper">
+          <button class="goal-adjust-button" id="goal-minus">-</button>
+          <input type="number" id="goal-input" min="10" max="500" value="100">
+          <button class="goal-adjust-button" id="goal-plus">+</button>
         </div>
       </div>
-
-      <!-- Dashboard Grid -->
-      <div class="dashboard-grid">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Today's Reps</div>
-            <div class="card-icon card-icon-primary">🏋️</div>
-          </div>
-          <div class="stat-value" id="today-reps">0</div>
-          <div class="stat-label">Total repetitions</div>
-          <div class="stat-change stat-change-positive">
-            <span>↑</span>
-            <span>12% from yesterday</span>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Workout Time</div>
-            <div class="card-icon card-icon-success">⏱️</div>
-          </div>
-          <div class="stat-value" id="workout-time">0:00</div>
-          <div class="stat-label">Total time today</div>
-          <div class="stat-change stat-change-positive">
-            <span>↑</span>
-            <span>5% from average</span>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Weekly Goal</div>
-            <div class="card-icon card-icon-warning">🎯</div>
-          </div>
-          <div class="stat-value" id="weekly-goal">45%</div>
-          <div class="stat-label">Progress to goal</div>
-          <div class="stat-change">
-            <span>🔥</span>
-            <span>On track for this week</span>
-          </div>
-        </div>
+      <div id="progress-bar-container">
+        <div id="progress-bar"></div>
       </div>
+    </div>
 
-      <!-- Video Container -->
-      <div class="video-container">
-        <canvas id="video-canvas"></canvas>
-        <video id="video" autoplay playsinline muted></video>
-        
-        <div class="video-overlay">
-          <button class="btn btn-outline btn-icon" id="toggle-detection">👁️</button>
-          <button class="btn btn-danger btn-icon" id="reset-counter">🔄</button>
-          <!-- Camera flip button (only visible on mobile) -->
-          <button class="btn btn-primary btn-icon" id="camera-flip">📱</button>
-        </div>
-        
-        <div class="video-controls">
-          <div class="rep-counter" id="rep-counter">0 reps</div>
-          <div class="timer" id="workout-timer">00:00</div>
-        </div>
-      </div>
+    <div id="menu-icon">
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
 
-      <!-- Charts -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Workout Progress</div>
-        </div>
-        <div class="chart-container">
-          <canvas id="progress-chart"></canvas>
-        </div>
+    <div id="nav-drawer">
+      <div id="user-container" style="width: 80%; margin-bottom: 20px;">
+        <span id="user-greeting" style="display: block; margin-bottom: 15px; font-weight: 500;"></span>
+        <button id="login-button" class="control-button">Login/Sign Up</button>
+        <button id="leaderboard-button" class="control-button">Leaderboard</button>
+        <button id="session-history-button" class="control-button">History</button>
+        <button id="view-toggle" class="control-button">Show Detection</button>
       </div>
+      <div class="toggle-switch-container">
+        <label for="timer-rpm-toggle">Show Timer/RPM</label>
+        <label class="switch">
+          <input type="checkbox" id="timer-rpm-toggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div id="controls-container">
+      <button id="focus-mode-button" class="control-button">Focus Mode</button>
+    </div>
+
+    <div id="camera-status" style="display: none;">
+      Requesting camera access...
+    </div>
+
+    <video id="video" autoplay playsinline muted></video>
+    <div id="notification"></div>
+    <button id="exit-focus-mode" class="control-button" style="display: none;">Exit Focus Mode</button>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Login or Sign Up</h2>
+      <input type="text" id="username-input" placeholder="Enter your username">
+      <input type="password" id="password-input" placeholder="Enter your password">
+      <button id="login-submit" class="control-button">Go</button>
+      <p id="login-error" style="color:red; display:none;"></p>
     </div>
   </div>
 
-  <!-- Settings Panel -->
-  <div class="settings-panel" id="settings-panel">
-    <div class="settings-header">
-      <div class="settings-title">Settings</div>
-      <div class="close-settings" id="close-settings">✕</div>
+  <!-- Leaderboard Modal -->
+  <div id="leaderboard-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Leaderboard</h2>
+      <ol id="leaderboard-list"></ol>
     </div>
-
-    <div class="settings-section">
-      <div class="settings-section-title">Detection Settings</div>
-      
-      <div class="form-group">
-        <label class="form-label">Detection Type</label>
-        <select class="form-control form-select" id="detection-type">
-          <option value="motion">Motion Detection</option>
-          <option value="color">Color Tracking</option>
-          <option value="pose">Pose Estimation</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="toggle-label">
-          <span class="toggle-text">Show Detection Overlay</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="show-detection">
-            <span class="toggle-slider"></span>
-          </label>
-        </label>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Detection Sensitivity</label>
-        <div class="range-slider">
-          <input type="range" min="1" max="10" value="5" id="sensitivity">
-          <div class="range-values">
-            <span>Low</span>
-            <span>High</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Pause Between Reps (ms)</label>
-        <input type="number" class="form-control" id="min-rep-duration" value="1000" min="300" max="5000" step="100">
-        <div style="font-size: 0.8rem; color: var(--gray); margin-top: 0.5rem;">
-          Controls both the minimum time between reps and the pause duration after each rep is counted.
-        </div>
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div class="settings-section-title">Workout Goals</div>
-      
-      <div class="form-group">
-        <label class="form-label">Daily Rep Goal</label>
-        <input type="number" class="form-control" id="daily-goal" value="100">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Weekly Rep Goal</label>
-        <input type="number" class="form-control" id="weekly-goal-input" value="500">
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div class="settings-section-title">App Settings</div>
-      
-      <div class="form-group">
-        <label class="toggle-label">
-          <span class="toggle-text">Sound Effects</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="sound-effects" checked>
-            <span class="toggle-slider"></span>
-          </label>
-        </label>
-      </div>
-
-      <div class="form-group">
-        <label class="toggle-label">
-          <span class="toggle-text">Voice Announcements</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="voice-announcements">
-            <span class="toggle-slider"></span>
-          </label>
-        </label>
-      </div>
-
-      <div class="form-group">
-        <label class="toggle-label">
-          <span class="toggle-text">Save Workout History</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="save-history" checked>
-            <span class="toggle-slider"></span>
-          </label>
-        </label>
-      </div>
-    </div>
-
-    <button class="btn btn-primary" style="width: 100%;">Save Settings</button>
   </div>
 
-  <div class="version">v1.0.0</div>
+  <!-- Session History Modal -->
+  <div id="session-history-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Session History</h2>
+      <ul id="session-history-list"></ul>
+    </div>
+  </div>
 
-  <!-- Audio Elements -->
   <audio id="rep-sound" src="https://actions.google.com/sounds/v1/sports/tennis_ball_hit_bounce.ogg" preload="auto"></audio>
-  <audio id="milestone-sound" src="https://actions.google.com/sounds/v1/sports/crowd_cheer.ogg" preload="auto"></audio>
 
   <script>
-    // DOM Elements
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('video-canvas');
-    const ctx = canvas.getContext('2d');
-    const repCounter = document.getElementById('rep-counter');
-    const workoutTimer = document.getElementById('workout-timer');
-    const todayReps = document.getElementById('today-reps');
-    const workoutTime = document.getElementById('workout-time');
-    const weeklyGoal = document.getElementById('weekly-goal');
-    const loader = document.getElementById('loader');
-    const repSound = document.getElementById('rep-sound');
-    const milestoneSound = document.getElementById('milestone-sound');
-    const toggleDetectionBtn = document.getElementById('toggle-detection');
-    const resetCounterBtn = document.getElementById('reset-counter');
-    const startWorkoutBtn = document.getElementById('start-workout');
-    const toggleFocusModeBtn = document.getElementById('toggle-focus-mode');
-    const settingsPanel = document.getElementById('settings-panel');
-    const openSettingsBtn = document.getElementById('open-settings');
-    const closeSettingsBtn = document.getElementById('close-settings');
-    const sidebar = document.querySelector('.sidebar');
-    const menuToggle = document.querySelector('.menu-toggle');
-
-    // State variables
+    // Global variables
+    let openCvReady = false;
+    let ballTracker = null;
     let reps = 0;
-    let totalReps = 0;
-    let workoutActive = false;
-    let workoutStartTime = null;
-    let timerInterval = null;
-    let showDetection = false;
-    let detectionType = 'motion';
-    let sensitivity = 5;
-    let minRepDuration = 300;
-    let lastRepTime = 0;
-    let repHistory = [];
-    let workoutHistory = [];
-    let focusMode = false;
+    let ballState = 'waiting'; // waiting, ball_present, ball_away, ball_returned
+    let startTime = null;
+    let lastThrowTime = 0; // Timestamp of the last counted throw
+    let lastBallAbsentTime = 0; // Timestamp when the ball was last detected as absent
+    let absentFrames = 0; // Counter for consecutive frames where the ball is absent
 
-    // Initialize charts
-    function initCharts() {
-      const ctx = document.getElementById('progress-chart').getContext('2d');
+    // Rep counting parameters
+    const minTimeBetweenThrows = 1000; // Minimum time in ms between two throws to be counted as separate reps
+    const minAbsentTime = 500; // Minimum time in ms the ball must be absent to consider it a new throw
+    const ballAbsentThreshold = 5; // Number of consecutive frames ball must be absent to trigger state change
+
+    // Called when OpenCV.js is ready
+    function onOpenCvReady() {
+      openCvReady = true;
+      console.log('OpenCV.js is ready');
+      updateLoaderProgress(100, 'OpenCV.js loaded successfully');
       
-      // Sample data - would be replaced with actual user data
-      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const data = {
-        labels: labels,
-        datasets: [{
-          label: 'Daily Reps',
-          data: [65, 78, 52, 91, 43, 56, 0],
-          backgroundColor: 'rgba(67, 97, 238, 0.2)',
-          borderColor: 'rgba(67, 97, 238, 1)',
-          borderWidth: 2,
-          tension: 0.3,
-          fill: true
-        }]
-      };
-
-      const config = {
-        type: 'line',
-        data: data,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: false
-            },
-            tooltip: {
-              backgroundColor: 'rgba(26, 26, 46, 0.9)',
-              titleColor: '#fff',
-              bodyColor: '#fff',
-              borderColor: 'rgba(255, 255, 255, 0.1)',
-              borderWidth: 1,
-              padding: 10,
-              displayColors: false,
-              callbacks: {
-                label: function(context) {
-                  return `${context.parsed.y} reps`;
-                }
-              }
-            }
-          },
-          scales: {
-            x: {
-              grid: {
-                display: false,
-                drawBorder: false
-              },
-              ticks: {
-                color: 'rgba(255, 255, 255, 0.7)'
-              }
-            },
-            y: {
-              grid: {
-                color: 'rgba(255, 255, 255, 0.1)',
-                drawBorder: false
-              },
-              ticks: {
-                color: 'rgba(255, 255, 255, 0.7)',
-                padding: 10
-              },
-              beginAtZero: true
-            }
-          }
-        }
-      };
-
-      new Chart(ctx, config);
+      if (ballTracker) {
+        ballTracker.initialize();
+      }
+      
+      // Hide loader after a short delay
+      setTimeout(() => {
+        document.getElementById('loader').style.opacity = '0';
+        document.getElementById('loader').style.visibility = 'hidden';
+      }, 500);
     }
 
-    // Enhanced Motion Detector Class
-    class MotionDetector {
-      constructor() {
-        this.previousFrame = null;
-        this.backgroundFrame = null;
-        this.backgroundAlpha = 0.05; // Background adaptation rate
-        this.motionThreshold = 30; // Default threshold
-        this.minMotionPixels = 1000; // Minimum number of pixels that need to change
-        this.motionState = 'idle'; // idle, moving, cooldown
-        this.lastStateChange = 0;
-        this.cooldownPeriod = 300; // ms
-        this.consecutiveFrames = 0;
-        this.requiredFrames = 3; // Number of consecutive frames needed to confirm motion
-        this.motionHistory = []; // Store recent motion values for smoothing
-        this.historySize = 5; // Number of frames to keep in history
-        this.regionSize = 16; // Size of regions for regional motion detection
-        this.regionThreshold = 0.6; // Percentage of region that must show motion
-        this.motionRegions = []; // Track which regions have motion
-        this.adaptiveThreshold = true; // Use adaptive thresholding
-        this.noiseReduction = true; // Apply noise reduction
-        this.frameSkip = 0; // Process every frame by default
-        this.frameCount = 0;
-      }
-
-      setSensitivity(value) {
-        // Scale 1-10 sensitivity to appropriate thresholds
-        this.motionThreshold = 50 - (value * 4); // Higher sensitivity = lower threshold
-        this.minMotionPixels = 2000 - (value * 150); // Higher sensitivity = fewer pixels needed
-        this.requiredFrames = Math.max(2, 5 - Math.floor(value / 2)); // Higher sensitivity = fewer frames needed
-        this.regionThreshold = 0.7 - (value * 0.03); // Higher sensitivity = lower region threshold
-        this.backgroundAlpha = 0.01 + (value * 0.01); // Higher sensitivity = faster background adaptation
-      }
-
-      detect(context, videoElement) {
-        // Draw current frame to canvas
-        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-        
-        // Skip frames if needed (for performance)
-        this.frameCount++;
-        if (this.frameSkip > 0 && (this.frameCount % (this.frameSkip + 1) !== 0)) {
-          return false;
-        }
-        
-        // Get current frame data
-        const currentFrame = context.getImageData(0, 0, canvas.width, canvas.height);
-        const currentData = currentFrame.data;
-        
-        // If we don't have a previous frame, store this one and return
-        if (!this.previousFrame) {
-          this.previousFrame = currentFrame;
-          this.backgroundFrame = new ImageData(
-            new Uint8ClampedArray(currentData), 
-            currentFrame.width, 
-            currentFrame.height
-          );
-          return false;
-        }
-        
-        const previousData = this.previousFrame.data;
-        const backgroundData = this.backgroundFrame.data;
-        let motionPixels = 0;
-        
-        // Initialize or reset motion regions
-        if (this.motionRegions.length === 0) {
-          const regionsX = Math.ceil(canvas.width / this.regionSize);
-          const regionsY = Math.ceil(canvas.height / this.regionSize);
-          this.motionRegions = new Array(regionsX * regionsY).fill(0);
-        } else {
-          this.motionRegions.fill(0);
-        }
-        
-        // Compare frames to detect motion with regional analysis
-        for (let y = 0; y < canvas.height; y++) {
-          for (let x = 0; x < canvas.width; x++) {
-            const i = (y * canvas.width + x) * 4;
-            
-            // Calculate region index
-            const regionX = Math.floor(x / this.regionSize);
-            const regionY = Math.floor(y / this.regionSize);
-            const regionIdx = regionY * Math.ceil(canvas.width / this.regionSize) + regionX;
-            
-            // Calculate pixel brightness (simple grayscale conversion)
-            const currentBrightness = (currentData[i] * 0.299 + currentData[i+1] * 0.587 + currentData[i+2] * 0.114) / 255;
-            const prevBrightness = (previousData[i] * 0.299 + previousData[i+1] * 0.587 + previousData[i+2] * 0.114) / 255;
-            const bgBrightness = (backgroundData[i] * 0.299 + backgroundData[i+1] * 0.587 + backgroundData[i+2] * 0.114) / 255;
-            
-            // Calculate difference from both previous frame and background model
-            const frameDiff = Math.abs(currentBrightness - prevBrightness);
-            const bgDiff = Math.abs(currentBrightness - bgBrightness);
-            
-            // Determine threshold (fixed or adaptive)
-            let threshold = this.motionThreshold / 255; // Convert to 0-1 range
-            if (this.adaptiveThreshold) {
-              // Make threshold adaptive based on local brightness
-              threshold *= (0.5 + currentBrightness * 0.5); // Brighter areas need more change
-            }
-            
-            // Detect motion using both frame difference and background difference
-            if (frameDiff > threshold && bgDiff > threshold * 0.5) {
-              // Count as motion pixel
-              motionPixels++;
-              this.motionRegions[regionIdx]++;
-              
-              // Update background model (slower for moving pixels)
-              backgroundData[i] = backgroundData[i] * (1 - this.backgroundAlpha * 0.2) + currentData[i] * (this.backgroundAlpha * 0.2);
-              backgroundData[i+1] = backgroundData[i+1] * (1 - this.backgroundAlpha * 0.2) + currentData[i+1] * (this.backgroundAlpha * 0.2);
-              backgroundData[i+2] = backgroundData[i+2] * (1 - this.backgroundAlpha * 0.2) + currentData[i+2] * (this.backgroundAlpha * 0.2);
-              
-              // Optionally highlight motion pixels if detection overlay is enabled
-              if (showDetection) {
-                // Draw a small semi-transparent rectangle at motion point
-                context.fillStyle = 'rgba(76, 201, 240, 0.5)';
-                context.fillRect(x, y, 2, 2);
-              }
-            } else {
-              // Update background model (faster for static pixels)
-              backgroundData[i] = backgroundData[i] * (1 - this.backgroundAlpha) + currentData[i] * this.backgroundAlpha;
-              backgroundData[i+1] = backgroundData[i+1] * (1 - this.backgroundAlpha) + currentData[i+1] * this.backgroundAlpha;
-              backgroundData[i+2] = backgroundData[i+2] * (1 - this.backgroundAlpha) + currentData[i+2] * this.backgroundAlpha;
-            }
-          }
-        }
-        
-        // Count regions with significant motion
-        let activeRegions = 0;
-        const pixelsPerRegion = this.regionSize * this.regionSize;
-        
-        for (let i = 0; i < this.motionRegions.length; i++) {
-          if (this.motionRegions[i] > pixelsPerRegion * this.regionThreshold) {
-            activeRegions++;
-            
-            // Visualize active regions if detection overlay is enabled
-            if (showDetection) {
-              const regionsPerRow = Math.ceil(canvas.width / this.regionSize);
-              const regionY = Math.floor(i / regionsPerRow);
-              const regionX = i % regionsPerRow;
-              
-              context.strokeStyle = 'rgba(231, 29, 54, 0.7)';
-              context.lineWidth = 2;
-              context.strokeRect(
-                regionX * this.regionSize, 
-                regionY * this.regionSize, 
-                this.regionSize, 
-                this.regionSize
-              );
-            }
-          }
-        }
-        
-        // Add current motion value to history for smoothing
-        this.motionHistory.push(motionPixels);
-        if (this.motionHistory.length > this.historySize) {
-          this.motionHistory.shift();
-        }
-        
-        // Calculate smoothed motion value
-        const smoothedMotion = this.motionHistory.reduce((sum, val) => sum + val, 0) / this.motionHistory.length;
-        
-        // Store current frame as previous for next comparison
-        this.previousFrame = currentFrame;
-        
-        const now = Date.now();
-        let repDetected = false;
-        
-        // State machine for rep detection using smoothed motion and active regions
-        const motionDetected = smoothedMotion > this.minMotionPixels || activeRegions > (this.motionRegions.length * 0.1);
-        
-        if (motionDetected) {
-          // Motion detected
-          if (this.motionState === 'idle') {
-            this.consecutiveFrames++;
-            
-            if (this.consecutiveFrames >= this.requiredFrames) {
-              this.motionState = 'moving';
-              this.lastStateChange = now;
-              this.consecutiveFrames = 0;
-            }
-          }
-        } else {
-          // No motion detected
-          this.consecutiveFrames = 0;
-          
-          if (this.motionState === 'moving' && (now - this.lastStateChange) > minRepDuration) {
-            this.motionState = 'cooldown';
-            this.lastStateChange = now;
-            repDetected = true;
-          } else if (this.motionState === 'cooldown' && (now - this.lastStateChange) > this.cooldownPeriod) {
-            this.motionState = 'idle';
-          }
-        }
-        
-        // Draw motion state indicator and debug information if detection overlay is enabled
-        if (showDetection) {
-          // Draw state indicator
-          const stateColors = {
-            'idle': 'rgba(46, 196, 182, 0.8)',
-            'moving': 'rgba(231, 29, 54, 0.8)',
-            'cooldown': 'rgba(255, 159, 28, 0.8)'
-          };
-          
-          context.fillStyle = stateColors[this.motionState];
-          context.fillRect(10, 10, 30, 30);
-          
-          // Draw motion level bar
-          const barWidth = 150;
-          const barHeight = 15;
-          const barX = 50;
-          const barY = 18;
-          const motionPercentage = Math.min(1, smoothedMotion / (this.minMotionPixels * 1.5));
-          
-          // Background bar
-          context.fillStyle = 'rgba(255, 255, 255, 0.2)';
-          context.fillRect(barX, barY, barWidth, barHeight);
-          
-          // Motion level bar
-          context.fillStyle = motionPercentage > 0.8 ? 'rgba(231, 29, 54, 0.8)' : 
-                             motionPercentage > 0.4 ? 'rgba(255, 159, 28, 0.8)' : 
-                             'rgba(46, 196, 182, 0.8)';
-          context.fillRect(barX, barY, barWidth * motionPercentage, barHeight);
-          
-          // Threshold marker
-          const thresholdPosition = barX + (barWidth * (this.minMotionPixels / (this.minMotionPixels * 1.5)));
-          context.fillStyle = 'rgba(255, 255, 255, 0.8)';
-          context.fillRect(thresholdPosition - 1, barY - 5, 2, barHeight + 10);
-          
-          // Add text labels
-          context.font = '16px Montserrat';
-          context.fillStyle = 'white';
-          context.fillText(`State: ${this.motionState}`, 50, 50);
-          context.fillText(`Motion: ${Math.round(smoothedMotion)}`, 50, 75);
-          context.fillText(`Regions: ${activeRegions}/${this.motionRegions.length}`, 50, 100);
-          context.fillText(`Threshold: ${this.minMotionPixels}`, 50, 125);
-          
-          // Draw frame processing info
-          if (this.frameSkip > 0) {
-            context.fillText(`Processing: 1/${this.frameSkip + 1} frames`, 50, 150);
-          }
-        }
-        
-        return repDetected;
+    // Update loader progress
+    function updateLoaderProgress(percentage, message) {
+      const progressBar = document.getElementById('loader-progress');
+      const percentageText = document.getElementById('loader-percentage');
+      const loaderMessage = document.querySelector('.loader-message');
+      
+      progressBar.style.width = `${percentage}%`;
+      percentageText.textContent = `${percentage}%`;
+      
+      if (message) {
+        loaderMessage.textContent = message;
       }
     }
 
-    // Color Tracker Class
-    class ColorTracker {
-      constructor() {
-        this.targetHue = 0; // Default to red
-        this.hueRange = 20;
-        this.minSaturation = 50;
-        this.minValue = 50;
-        this.minContourArea = 1000;
-        this.trackedObject = { x: 0, y: 0, width: 0, height: 0, area: 0 };
-        this.previousY = null;
-        this.movementThreshold = 20;
-        this.movementState = 'idle'; // idle, up, down
-        this.lastStateChange = 0;
-      }
-
-      setSensitivity(value) {
-        this.hueRange = 10 + value;
-        this.minContourArea = 2000 - (value * 150);
-        this.movementThreshold = 30 - (value * 2);
-      }
-
-      detect(context, videoElement) {
-        if (typeof cv === 'undefined') return false;
-
-        let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
-        let hsv = new cv.Mat();
-        let mask = new cv.Mat();
-        let contours = new cv.MatVector();
-        let hierarchy = new cv.Mat();
-
-        // Draw current frame to canvas
-        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-        
-        // Get frame data for OpenCV processing
-        src.data.set(context.getImageData(0, 0, canvas.width, canvas.height).data);
-        
-        // Convert to HSV color space
-        cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
-        cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
-        
-        // Define range for target color in HSV
-        let lowerBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), 
-          [Math.max(0, this.targetHue - this.hueRange), this.minSaturation, this.minValue, 0]);
-        let upperBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), 
-          [Math.min(180, this.targetHue + this.hueRange), 255, 255, 255]);
-        
-        // Threshold the HSV image to get only target colors
-        cv.inRange(hsv, lowerBound, upperBound, mask);
-        
-        // Find contours
-        cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-        
-        // Find the largest contour
-        let maxArea = 0;
-        let maxContourIndex = -1;
-        
-        for (let i = 0; i < contours.size(); ++i) {
-          let contour = contours.get(i);
-          let area = cv.contourArea(contour);
-          
-          if (area > maxArea && area > this.minContourArea) {
-            maxArea = area;
-            maxContourIndex = i;
-          }
-        }
-        
-        let repDetected = false;
-        const now = Date.now();
-        
-        // If we found a valid contour
-        if (maxContourIndex !== -1) {
-          let contour = contours.get(maxContourIndex);
-          let rect = cv.boundingRect(contour);
-          
-          this.trackedObject = {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-            area: maxArea,
-            centerY: rect.y + (rect.height / 2)
-          };
-          
-          // Draw rectangle around the tracked object if detection overlay is enabled
-          if (showDetection) {
-            context.strokeStyle = '#4cc9f0';
-            context.lineWidth = 2;
-            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
-            
-            // Draw center point
-            context.fillStyle = '#e71d36';
-            context.beginPath();
-            context.arc(rect.x + (rect.width / 2), rect.y + (rect.height / 2), 5, 0, 2 * Math.PI);
-            context.fill();
-          }
-          
-          // Track vertical movement for rep counting
-          if (this.previousY !== null) {
-            const deltaY = this.trackedObject.centerY - this.previousY;
-            
-            // State machine for rep detection
-            if (deltaY < -this.movementThreshold && this.movementState !== 'up') {
-              // Moving up
-              this.movementState = 'up';
-              this.lastStateChange = now;
-            } else if (deltaY > this.movementThreshold && this.movementState === 'up' && 
-                      (now - this.lastStateChange) > minRepDuration) {
-              // Moving down after being up
-              this.movementState = 'down';
-              this.lastStateChange = now;
-              repDetected = true;
-            } else if (Math.abs(deltaY) < this.movementThreshold && this.movementState === 'down' && 
-                      (now - this.lastStateChange) > 300) {
-              // Back to idle
-              this.movementState = 'idle';
-            }
-          }
-          
-          this.previousY = this.trackedObject.centerY;
-        } else {
-          this.previousY = null;
-        }
-        
-        // Draw movement state indicator if detection overlay is enabled
-        if (showDetection) {
-          context.fillStyle = this.movementState === 'idle' ? 'rgba(46, 196, 182, 0.5)' : 
-                             this.movementState === 'up' ? 'rgba(231, 29, 54, 0.5)' : 
-                             'rgba(255, 159, 28, 0.5)';
-          context.fillRect(10, 10, 20, 20);
-          
-          // Add text label
-          context.font = '16px Montserrat';
-          context.fillStyle = 'white';
-          context.fillText(`State: ${this.movementState}`, 40, 25);
-          if (this.previousY !== null) {
-            context.fillText(`Y-Pos: ${Math.round(this.trackedObject.centerY)}`, 40, 50);
-          }
-        }
-        
-        // Clean up OpenCV resources
-        src.delete();
-        hsv.delete();
-        mask.delete();
-        contours.delete();
-        hierarchy.delete();
-        lowerBound.delete();
-        upperBound.delete();
-        
-        return repDetected;
-      }
-    }
-
-    // PoseDetector Class for hand and arm tracking
-    class PoseDetector {
-      constructor() {
-        this.previousHandY = null;
-        this.lowestHandY = null;
-        this.highestHandY = null;
-        this.rangeOfMotionThreshold = 0.65; // 65% range of motion required for a rep
-        this.movementState = 'idle'; // idle, up, down
-        this.lastStateChange = 0;
-        this.movementThreshold = 10;
-        this.shoulderX = 0;
-        this.shoulderY = 0;
-        this.armX = 0;
-        this.armY = 0;
-        this.handX = 0;
-        this.handY = 0;
-        this.calibrated = false;
-        this.handDetected = false;
-        this.armDetected = false;
-        this.movementHistory = []; // Store recent movement values for smoothing
-        this.historySize = 5; // Number of frames to keep in history
-      }
-
-      setSensitivity(value) {
-        // Adjust sensitivity parameters
-        this.movementThreshold = 15 - (value * 1); // Higher sensitivity = lower threshold
-        this.rangeOfMotionThreshold = Math.max(0.5, 0.8 - (value * 0.03)); // Higher sensitivity = lower ROM requirement
-      }
-
-      detect(context, videoElement) {
-        if (typeof cv === 'undefined') return false;
-
-        // Draw current frame to canvas
-        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-        
-        // Hand and arm tracking with color detection
-        let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
-        let hsv = new cv.Mat();
-        let mask = new cv.Mat();
-        let contours = new cv.MatVector();
-        let hierarchy = new cv.Mat();
-        
-        // Get frame data for OpenCV processing
-        src.data.set(context.getImageData(0, 0, canvas.width, canvas.height).data);
-        
-        // Convert to HSV color space for better color detection
-        cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
-        cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
-        
-        // Define range for skin color in HSV (improved for hand detection)
-        let lowerBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 20, 70, 0]);
-        let upperBound = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [25, 170, 255, 255]);
-        
-        // Threshold the HSV image to get only skin colors
-        cv.inRange(hsv, lowerBound, upperBound, mask);
-        
-        // Apply morphological operations to improve hand detection
-        let kernel = cv.Mat.ones(3, 3, cv.CV_8U);
-        cv.morphologyEx(mask, mask, cv.MORPH_OPEN, kernel);
-        cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kernel);
-        kernel.delete();
-        
-        // Find contours
-        cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-        
-        // Find contours that could be hand, arm, or shoulder
-        let areas = [];
-        for (let i = 0; i < contours.size(); ++i) {
-          let contour = contours.get(i);
-          let area = cv.contourArea(contour);
-          if (area > 300) { // Lower threshold to detect smaller hand regions
-            areas.push({index: i, area: area});
-          }
-        }
-        
-        // Sort by area (descending)
-        areas.sort((a, b) => b.area - a.area);
-        
-        let repDetected = false;
-        const now = Date.now();
-        
-        // Reset detection flags
-        this.handDetected = false;
-        this.armDetected = false;
-        
-        // If we found at least one contour
-        if (areas.length > 0) {
-          // Process the contours to identify hand, arm, and shoulder
-          // We'll use position and size heuristics to identify body parts
-          
-          // First, find the largest contour (likely the main body/shoulder area)
-          let shoulderContour = contours.get(areas[0].index);
-          let shoulderRect = cv.boundingRect(shoulderContour);
-          
-          this.shoulderX = shoulderRect.x + (shoulderRect.width / 2);
-          this.shoulderY = shoulderRect.y + (shoulderRect.height / 2);
-          
-          // Look for smaller contours that could be the arm or hand
-          // We'll use the top 3 contours if available
-          let potentialParts = Math.min(areas.length, 3);
-          
-          for (let i = 0; i < potentialParts; i++) {
-            let contour = contours.get(areas[i].index);
-            let rect = cv.boundingRect(contour);
-            let centerX = rect.x + (rect.width / 2);
-            let centerY = rect.y + (rect.height / 2);
-            
-            // Use heuristics to identify parts
-            // Hand is typically smaller and can be at the extremity
-            if (!this.handDetected && rect.width < shoulderRect.width * 0.7 && rect.height < shoulderRect.height * 0.7) {
-              this.handX = centerX;
-              this.handY = centerY;
-              this.handDetected = true;
-              
-              // Draw hand point if detection overlay is enabled
-              if (showDetection) {
-                context.fillStyle = '#e71d36';
-                context.beginPath();
-                context.arc(this.handX, this.handY, 8, 0, 2 * Math.PI);
-                context.fill();
-                context.fillText('Hand', this.handX + 15, this.handY);
-              }
-            }
-            // Arm is typically medium-sized and between shoulder and hand
-            else if (!this.armDetected && rect.width < shoulderRect.width * 0.9) {
-              this.armX = centerX;
-              this.armY = centerY;
-              this.armDetected = true;
-              
-              // Draw arm point if detection overlay is enabled
-              if (showDetection) {
-                context.fillStyle = '#4cc9f0';
-                context.beginPath();
-                context.arc(this.armX, this.armY, 8, 0, 2 * Math.PI);
-                context.fill();
-                context.fillText('Arm', this.armX + 15, this.armY);
-              }
-            }
-          }
-          
-          // If we couldn't detect a separate hand, use the arm position as a fallback
-          if (!this.handDetected && this.armDetected) {
-            this.handX = this.armX;
-            this.handY = this.armY;
-            this.handDetected = true;
-          }
-          
-          // Draw additional tracking elements if detection overlay is enabled
-          if (showDetection) {
-            // Draw shoulder point
-            context.fillStyle = '#4cc9f0';
-            context.beginPath();
-            context.arc(this.shoulderX, this.shoulderY, 8, 0, 2 * Math.PI);
-            context.fill();
-            context.fillText('Shoulder', this.shoulderX + 15, this.shoulderY);
-            
-            // Draw connecting lines between detected body parts
-            if (this.armDetected && this.handDetected) {
-              // Draw line connecting shoulder, arm, and hand
-              context.strokeStyle = '#ffffff';
-              context.lineWidth = 2;
-              context.beginPath();
-              context.moveTo(this.shoulderX, this.shoulderY);
-              if (this.armX !== this.handX || this.armY !== this.handY) {
-                context.lineTo(this.armX, this.armY);
-              }
-              context.lineTo(this.handX, this.handY);
-              context.stroke();
-            } else if (this.armDetected) {
-              // Draw line connecting shoulder and arm
-              context.strokeStyle = '#ffffff';
-              context.lineWidth = 2;
-              context.beginPath();
-              context.moveTo(this.shoulderX, this.shoulderY);
-              context.lineTo(this.armX, this.armY);
-              context.stroke();
-            } else if (this.handDetected) {
-              // Draw line connecting shoulder and hand
-              context.strokeStyle = '#ffffff';
-              context.lineWidth = 2;
-              context.beginPath();
-              context.moveTo(this.shoulderX, this.shoulderY);
-              context.lineTo(this.handX, this.handY);
-              context.stroke();
-            }
-          }
-          
-          // Track vertical movement of hand for rep counting
-          if (this.handDetected && this.previousHandY !== null) {
-            // Add current hand position to movement history for smoothing
-            this.movementHistory.push(this.handY);
-            if (this.movementHistory.length > this.historySize) {
-              this.movementHistory.shift();
-            }
-            
-            // Calculate smoothed hand position
-            const smoothedHandY = this.movementHistory.reduce((sum, val) => sum + val, 0) / this.movementHistory.length;
-            
-            // Initialize calibration values if not set
-            if (!this.calibrated) {
-              this.lowestHandY = smoothedHandY;
-              this.highestHandY = smoothedHandY;
-              this.calibrated = true;
-            }
-            
-            // Update range of motion boundaries with some dampening to avoid jitter
-            if (smoothedHandY < this.highestHandY - 5) {
-              this.highestHandY = smoothedHandY; // Higher position (lower Y value)
-            }
-            if (smoothedHandY > this.lowestHandY + 5) {
-              this.lowestHandY = smoothedHandY; // Lower position (higher Y value)
-            }
-            
-            // Calculate total range of motion
-            const totalRange = this.lowestHandY - this.highestHandY;
-            
-            // Calculate current position as percentage of range
-            let currentPosition = 0;
-            if (totalRange > 0) {
-              currentPosition = (this.lowestHandY - smoothedHandY) / totalRange;
-            }
-            
-            // State machine for rep detection with range of motion threshold
-            const deltaY = smoothedHandY - this.previousHandY;
-            
-            if (deltaY < -this.movementThreshold && this.movementState !== 'up') {
-              // Moving up
-              this.movementState = 'up';
-              this.lastStateChange = now;
-            } else if (deltaY > this.movementThreshold && this.movementState === 'up' && 
-                      (now - this.lastStateChange) > minRepDuration) {
-              // Moving down after being up
-              // Only count as rep if range of motion threshold was met
-              if (currentPosition >= this.rangeOfMotionThreshold) {
-                this.movementState = 'down';
-                this.lastStateChange = now;
-                repDetected = true;
-              }
-            } else if (Math.abs(deltaY) < this.movementThreshold && this.movementState === 'down' && 
-                      (now - this.lastStateChange) > 300) {
-              // Back to idle
-              this.movementState = 'idle';
-            }
-            
-            // Update previous hand position for next frame
-            this.previousHandY = smoothedHandY;
-            
-            // Draw ROM indicator if detection overlay is enabled
-            if (showDetection) {
-              // Draw movement state
-              context.font = '16px Montserrat';
-              context.fillStyle = 'white';
-              context.fillText(`State: ${this.movementState}`, 40, 50);
-              context.fillText(`Hand Y: ${Math.round(smoothedHandY)}`, 40, 75);
-              context.fillText(`ROM: ${Math.round(currentPosition * 100)}%`, 40, 100);
-              context.fillText(`Threshold: ${Math.round(this.rangeOfMotionThreshold * 100)}%`, 40, 125);
-              
-              // Draw ROM bar
-              const barWidth = 150;
-              const barHeight = 15;
-              const barX = 40;
-              const barY = 135;
-              
-              // Background bar
-              context.fillStyle = 'rgba(255, 255, 255, 0.2)';
-              context.fillRect(barX, barY, barWidth, barHeight);
-              
-              // Current ROM bar
-              context.fillStyle = currentPosition >= this.rangeOfMotionThreshold ? 
-                                'rgba(46, 196, 182, 0.8)' : 'rgba(231, 29, 54, 0.8)';
-              context.fillRect(barX, barY, barWidth * currentPosition, barHeight);
-              
-              // Draw threshold marker
-              context.fillStyle = 'rgba(255, 255, 255, 0.8)';
-              context.fillRect(barX + (barWidth * this.rangeOfMotionThreshold) - 1, barY - 5, 2, barHeight + 10);
-            }
-          } else if (this.handDetected) {
-            // First detection of hand, initialize tracking
-            this.previousHandY = this.handY;
-            this.movementHistory = Array(this.historySize).fill(this.handY);
-          }
-              
-            }
-          }
-        } else {
-          // No contours detected, reset tracking
-          this.previousHandY = null;
-          this.handDetected = false;
-          this.armDetected = false;
-        }
-        
-        // Draw movement state indicator if detection overlay is enabled
-        if (showDetection) {
-          context.fillStyle = this.movementState === 'idle' ? 'rgba(46, 196, 182, 0.5)' : 
-                             this.movementState === 'up' ? 'rgba(231, 29, 54, 0.5)' : 
-                             'rgba(255, 159, 28, 0.5)';
-          context.fillRect(10, 10, 20, 20);
-          
-          // Add text label
-          context.font = '16px Montserrat';
-          context.fillStyle = 'white';
-          context.fillText(`State: ${this.movementState}`, 40, 25);
-          if (this.handDetected) {
-            context.fillText(`Hand Y: ${Math.round(this.handY)}`, 150, 25);
-          }
-        }
-        
-        // Clean up OpenCV resources
-        src.delete();
-        hsv.delete();
-        mask.delete();
-        contours.delete();
-        hierarchy.delete();
-        lowerBound.delete();
-        upperBound.delete();
-        
-        return repDetected;
-      }
-    }
-
-    // Initialize detectors
-    const motionDetector = new MotionDetector();
-    const colorTracker = new ColorTracker();
-    const poseDetector = new PoseDetector();
-    let activeDetector = motionDetector;
-
-    // Setup camera with mobile optimizations
+    // Setup camera with improved error handling
     async function setupCamera() {
+      const video = document.getElementById('video');
+      const cameraStatus = document.getElementById('camera-status');
+      const repsDisplay = document.getElementById('reps');
+
+      repsDisplay.textContent = 'Initializing...';
+      cameraStatus.style.display = 'block';
+      cameraStatus.innerHTML = 'Checking camera permissions...';
+
       try {
-        // Check if this is a mobile device
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        const isAndroid = /Android/i.test(navigator.userAgent);
-        
-        console.log('Device detection:', { isMobile, isIOS, isAndroid, userAgent: navigator.userAgent });
-        
-        // Adjust constraints based on device type
-        const constraints = {
-          audio: false,
-          video: {
-            width: { ideal: isMobile ? 640 : 1280 },
-            height: { ideal: isMobile ? 480 : 720 },
-            facingMode: 'user'
-          }
-        };
-        
-        // iOS-specific adjustments
-        if (isIOS) {
-          // iOS sometimes works better with more flexible constraints
-          constraints.video.width = { min: 320, ideal: 640, max: 1280 };
-          constraints.video.height = { min: 240, ideal: 480, max: 720 };
-          
-          // Ensure video element is properly sized and visible
-          video.style.width = '100%';
-          video.style.height = 'auto';
-          video.style.objectFit = 'contain';
-          video.setAttribute('playsinline', true); // Critical for iOS inline video
-          video.setAttribute('autoplay', true);
-          video.setAttribute('muted', true);
-        }
-        
-        // For mobile devices, especially iOS, we need to handle orientation changes
-        const handleOrientationChange = () => {
-          console.log('Orientation/resize event detected');
-          setTimeout(() => {
-            if (video.videoWidth > 0) {
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-              console.log('Canvas resized to:', { width: canvas.width, height: canvas.height });
-              
-              // Force redraw of UI elements
-              if (isIOS) {
-                // This can help with iOS rendering issues
-                video.style.display = 'none';
-                setTimeout(() => { video.style.display = 'block'; }, 50);
-              }
-            } else {
-              console.warn('Video dimensions not available during resize');
+        // Add a timeout for the getUserMedia request
+        const stream = await Promise.race([
+          navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: 'user',
+              frameRate: { ideal: 30 }
             }
-          }, 800); // Increased delay to allow video dimensions to update on iOS
-        };
-        
-        window.addEventListener('orientationchange', handleOrientationChange);
-        window.addEventListener('resize', handleOrientationChange);
-        
-        // Get camera stream
-        console.log('Requesting camera with constraints:', constraints);
-        let stream;
-        
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-          console.log('Camera access granted with primary constraints');
-        } catch (err) {
-          console.warn('Failed with primary constraints:', err);
-          
-          // Fallback to simpler constraints
-          console.log('Trying fallback constraints...');
-          const fallbackConstraints = { video: true, audio: false };
-          stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
-          console.log('Camera access granted with fallback constraints');
-        }
-        
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Camera request timed out')), 10000))
+        ]);
+
         video.srcObject = stream;
+        localStorage.setItem('wallBallCameraAccess', 'granted');
+        cameraStatus.innerHTML = 'Camera access granted. Loading video...';
         
-        return new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Video load timeout')), 10000);
           video.onloadedmetadata = () => {
-            console.log('Video metadata loaded:', { width: video.videoWidth, height: video.videoHeight });
-            // Set canvas dimensions to match video
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // Use the existing camera flip button for mobile devices
-            const cameraFlipBtn = document.getElementById('camera-flip');
-            if (isMobile && cameraFlipBtn) {
-              // Show the camera flip button
-              cameraFlipBtn.style.display = 'flex';
-              cameraFlipBtn.title = 'Switch Camera';
-              
-              // Set initial icon based on current camera
-              cameraFlipBtn.innerHTML = constraints.video.facingMode === 'user' ? '📱' : '🤳';
-              
-              console.log('Camera flip button enabled for mobile device');
-              
-              // Add click event listener
-              cameraFlipBtn.addEventListener('click', async () => {
-                // Toggle between front and back camera
-                const currentFacingMode = constraints.video.facingMode;
-                constraints.video.facingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-                
-                // Update button icon
-                cameraFlipBtn.innerHTML = constraints.video.facingMode === 'user' ? '📱' : '🤳';
-                
-                // Stop current stream
-                stream.getTracks().forEach(track => track.stop());
-                
-                try {
-                  // Get new stream with updated constraints
-                  const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-                  video.srcObject = newStream;
-                  
-                  // Update canvas dimensions after camera switch
-                  setTimeout(() => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                  }, 300);
-                } catch (err) {
-                  console.error('Error flipping camera:', err);
-                  alert('Unable to flip camera. Your device may not support this feature.');
-                  // Revert to previous camera
-                  constraints.video.facingMode = currentFacingMode;
-                  cameraFlipBtn.innerHTML = constraints.video.facingMode === 'user' ? '📱' : '🤳';
-                  const revertStream = await navigator.mediaDevices.getUserMedia(constraints);
-                  video.srcObject = revertStream;
-                }
-              });
-            }
-            
+            clearTimeout(timeout);
+            video.width = video.videoWidth;
+            video.height = video.videoHeight;
             resolve();
           };
         });
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        alert('Error accessing camera. Please make sure you have granted camera permissions and are using a supported browser.');
+
+        await video.play();
+        cameraStatus.style.display = 'none';
+        return video;
+      } catch (err) {
+        localStorage.setItem('wallBallCameraAccess', 'denied');
+        cameraStatus.innerHTML = 
+          `Camera access failed: ${err.message}. <button onclick="requestCameraAgain()" class="control-button" style="padding: 5px 10px; font-size: 0.9rem;">Try Again</button>`;
+        repsDisplay.textContent = 'Camera Error';
+        console.error('Camera error:', err);
+        throw err;
       }
+    }
+    
+    // Request camera access again
+    function requestCameraAgain() {
+      document.getElementById('camera-status').innerHTML = 'Requesting camera access...';
+      main().catch(err => {
+        console.error('Failed to initialize after retry:', err);
+      });
+    }
+
+    // Draw circle helper function
+    function drawCircle(ctx, x, y, radius, color, thickness = 2) {
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = thickness;
+      ctx.stroke();
+    }
+    
+    // Draw ball detection visualization
+    function drawBallDetection(detectedBalls, ctx) {
+      detectedBalls.forEach((ball, index) => {
+        // Draw circle around detected ball
+        drawCircle(ctx, ball.x, ball.y, ball.radius, '#00FF00', 3);
+        
+        // Draw center point
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = '#FF0000';
+        ctx.fill();
+        
+        // Draw confidence score
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '16px Poppins';
+        ctx.fillText(`Ball ${index + 1}`, ball.x - 20, ball.y - ball.radius - 10);
+      });
+    }
+    
+    // Lacrosse Ball Tracker Class
+    class LacrosseBallTracker {
+      constructor() {
+        this.previousBalls = [];
+        this.ballHistory = {};
+        this.maxHistoryLength = 10;
+        
+        // Lacrosse ball specific parameters (regulation ball is 2.5 inches diameter)
+        this.minBallRadius = 20;  // Minimum radius for lacrosse ball detection
+        this.maxBallRadius = 60;  // Maximum radius for lacrosse ball detection
+        this.idealBallRadius = 30; // Ideal lacrosse ball radius in pixels
+        this.movementThreshold = 15; // Minimum movement to consider as significant
+        this.maxTrackingDistance = 180; // Maximum distance to track same ball
+        
+        // Detection quality thresholds
+        this.minDetectionScore = 0.3; // Minimum score to accept a detection
+        this.colorMatchThreshold = 0.2; // Minimum color match percentage
+        
+        // Lacrosse ball color ranges in HSV
+        this.colorRanges = {
+          white: { lower: [0, 0, 200], upper: [180, 30, 255] },
+          yellow: { lower: [20, 100, 100], upper: [30, 255, 255] },
+          orange: { lower: [10, 100, 100], upper: [20, 255, 255] }
+        };
+        
+        this.initialized = false;
+      }
+      
+      initialize() {
+        if (openCvReady) {
+          this.initialized = true;
+          console.log('Ball tracker initialized');
+        }
+      }
+      
+      detectBalls(videoElement) {
+        if (!this.initialized || !openCvReady) {
+          return [];
+        }
+        
+        try {
+          // Create OpenCV matrices
+          const src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+          const gray = new cv.Mat();
+          const hsv = new cv.Mat();
+          const mask = new cv.Mat();
+          const blurred = new cv.Mat();
+          const circles = new cv.Mat();
+          
+          // Capture frame from video
+          const cap = new cv.VideoCapture(videoElement);
+          cap.read(src);
+          
+          // Convert to HSV for better color filtering
+          cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+          cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+          
+          // Create mask for lacrosse ball colors (white, yellow, orange)
+          // White range
+          const whiteLower = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 0, 200, 0]);
+          const whiteUpper = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [180, 30, 255, 255]);
+          const whiteMask = new cv.Mat();
+          cv.inRange(hsv, whiteLower, whiteUpper, whiteMask);
+          
+          // Yellow range
+          const yellowLower = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [20, 100, 100, 0]);
+          const yellowUpper = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [30, 255, 255, 255]);
+          const yellowMask = new cv.Mat();
+          cv.inRange(hsv, yellowLower, yellowUpper, yellowMask);
+          
+          // Orange range
+          const orangeLower = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [10, 100, 100, 0]);
+          const orangeUpper = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [20, 255, 255, 255]);
+          const orangeMask = new cv.Mat();
+          cv.inRange(hsv, orangeLower, orangeUpper, orangeMask);
+          
+          // Combine all color masks
+          cv.bitwise_or(whiteMask, yellowMask, mask);
+          cv.bitwise_or(mask, orangeMask, mask);
+          
+          // Apply morphological operations to clean up the mask
+          const kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(5, 5));
+          cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kernel);
+          cv.morphologyEx(mask, mask, cv.MORPH_OPEN, kernel);
+          
+          // Convert to grayscale and apply mask
+          cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+          cv.bitwise_and(gray, mask, gray);
+          
+          // Apply Gaussian blur with lacrosse ball specific parameters
+          cv.GaussianBlur(gray, blurred, new cv.Size(7, 7), 1.5, 1.5);
+          
+          // Enhanced HoughCircles parameters specifically tuned for lacrosse balls
+          cv.HoughCircles(
+            blurred,
+            circles,
+            cv.HOUGH_GRADIENT,
+            1,              // dp: inverse ratio of accumulator resolution
+            100,            // minDist: minimum distance between circle centers
+            100,            // param1: upper threshold for edge detection
+            30,             // param2: accumulator threshold for center detection
+            this.minBallRadius,  // minRadius
+            this.maxBallRadius   // maxRadius
+          );
+          
+          let bestBall = null;
+          let bestScore = 0;
+          
+          // Process detected circles with lacrosse ball specific validation
+          for (let i = 0; i < circles.cols; i++) {
+            const x = circles.data32F[i * 3];
+            const y = circles.data32F[i * 3 + 1];
+            const radius = circles.data32F[i * 3 + 2];
+            
+            // Enhanced validation for lacrosse balls
+            if (this.isValidLacrosseBall(x, y, radius, videoElement.width, videoElement.height, mask)) {
+              // Calculate comprehensive quality score
+              const lacrosseBallScore = this.calculateLacrosseBallScore(x, y, radius, videoElement, mask);
+              
+              // Only accept detections above minimum quality threshold
+              if (lacrosseBallScore > this.minDetectionScore && lacrosseBallScore > bestScore) {
+                bestScore = lacrosseBallScore;
+                bestBall = { x, y, radius, timestamp: Date.now(), score: lacrosseBallScore };
+              }
+            }
+          }
+          
+          // Clean up OpenCV matrices
+          src.delete();
+          gray.delete();
+          hsv.delete();
+          mask.delete();
+          blurred.delete();
+          circles.delete();
+          whiteLower.delete();
+          whiteUpper.delete();
+          whiteMask.delete();
+          yellowLower.delete();
+          yellowUpper.delete();
+          yellowMask.delete();
+          orangeLower.delete();
+          orangeUpper.delete();
+          orangeMask.delete();
+          kernel.delete();
+          
+          // Return single best ball or empty array
+          return bestBall ? [bestBall] : [];
+          
+        } catch (error) {
+          console.error('Lacrosse ball detection error:', error);
+          return [];
+        }
+      }
+      
+      isValidBall(x, y, radius, frameWidth, frameHeight) {
+        // Check if ball is within frame bounds
+        if (x - radius < 0 || x + radius > frameWidth || 
+            y - radius < 0 || y + radius > frameHeight) {
+          return false;
+        }
+        
+        // Check if radius is within expected range
+        if (radius < this.minBallRadius || radius > this.maxBallRadius) {
+          return false;
+        }
+        
+        return true;
+      }
+      
+      isValidLacrosseBall(x, y, radius, frameWidth, frameHeight, colorMask) {
+        // Basic boundary and size validation
+        if (!this.isValidBall(x, y, radius, frameWidth, frameHeight)) {
+          return false;
+        }
+        
+        try {
+          // Check if the detected circle area has sufficient color match
+          const roi = new cv.Rect(
+            Math.max(0, x - radius), 
+            Math.max(0, y - radius), 
+            Math.min(frameWidth - Math.max(0, x - radius), radius * 2),
+            Math.min(frameHeight - Math.max(0, y - radius), radius * 2)
+          );
+          const maskRoi = colorMask.roi(roi);
+          
+          // Calculate the percentage of pixels that match lacrosse ball colors
+          const totalPixels = maskRoi.rows * maskRoi.cols;
+          const whitePixels = cv.countNonZero(maskRoi);
+          const colorMatchPercentage = whitePixels / totalPixels;
+          
+          maskRoi.delete();
+          
+          // Require minimum color match percentage for lacrosse ball
+          return colorMatchPercentage > this.colorMatchThreshold;
+          
+        } catch (error) {
+          console.warn('Color validation error:', error);
+          return true; // Fall back to basic validation
+        }
+      }
+      
+      calculateLacrosseBallScore(x, y, radius, videoElement, colorMask) {
+        try {
+          // 1. Radius score - prefer balls close to standard lacrosse ball size
+          const radiusScore = Math.max(0, 1 - Math.abs(radius - this.idealBallRadius) / this.idealBallRadius);
+          
+          // 2. Circularity score - lacrosse balls should be perfectly circular
+          const circularityScore = this.calculateCircularity(x, y, radius, videoElement);
+          
+          // 3. Color consistency score
+          const colorScore = this.calculateColorConsistency(x, y, radius, colorMask);
+          
+          // 4. Position preference (center of frame)
+          const centerX = videoElement.width / 2;
+          const centerY = videoElement.height / 2;
+          const distanceFromCenter = Math.sqrt(
+            Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
+          );
+          const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
+          const positionScore = 1 - (distanceFromCenter / maxDistance);
+          
+          // 5. Edge strength score
+          const edgeScore = this.calculateEdgeStrength(x, y, radius, videoElement);
+          
+          // Weighted combination optimized for lacrosse ball detection
+          const totalScore = (
+            radiusScore * 0.25 +      // Size is important
+            circularityScore * 0.25 +  // Shape is crucial
+            colorScore * 0.30 +        // Color is very important
+            positionScore * 0.10 +     // Position preference
+            edgeScore * 0.10           // Edge definition
+          );
+          
+          return totalScore;
+          
+        } catch (error) {
+          console.warn('Score calculation error:', error);
+          return 0.5; // Default moderate score
+        }
+      }
+      
+      calculateCircularity(x, y, radius, videoElement) {
+        // For now, return a high score since HoughCircles already filters for circular shapes
+        // In a more advanced implementation, we could analyze the actual contour
+        return 0.9;
+      }
+      
+      calculateColorConsistency(x, y, radius, colorMask) {
+        try {
+          const roi = new cv.Rect(
+            Math.max(0, x - radius), 
+            Math.max(0, y - radius), 
+            Math.min(colorMask.cols - Math.max(0, x - radius), radius * 2),
+            Math.min(colorMask.rows - Math.max(0, y - radius), radius * 2)
+          );
+          const maskRoi = colorMask.roi(roi);
+          
+          const totalPixels = maskRoi.rows * maskRoi.cols;
+          const matchingPixels = cv.countNonZero(maskRoi);
+          const consistency = matchingPixels / totalPixels;
+          
+          maskRoi.delete();
+          return Math.min(1.0, consistency * 2); // Boost the score for good color matches
+          
+        } catch (error) {
+          return 0.5;
+        }
+      }
+      
+      calculateEdgeStrength(x, y, radius, videoElement) {
+        // Simplified edge strength calculation
+        // In a full implementation, we could use Sobel operators
+        return 0.8; // Default good edge score
+      }
+      
+      filterAndTrackBalls(detectedBalls) {
+        const currentTime = Date.now();
+        
+        // Since we only track one ball, simplify the logic
+        if (detectedBalls.length === 0) {
+          this.previousBalls = [];
+          return [];
+        }
+        
+        const ball = detectedBalls[0]; // Only one ball
+        let trackedBall;
+        
+        // Check if we have a previous ball to track from
+        if (this.previousBalls.length > 0) {
+          const prevBall = this.previousBalls[0];
+          const distance = Math.sqrt(
+            Math.pow(ball.x - prevBall.x, 2) + 
+            Math.pow(ball.y - prevBall.y, 2)
+          );
+          
+          // If the ball moved too far, treat as new detection
+          if (distance > this.maxTrackingDistance) {
+            trackedBall = {
+              ...ball,
+              id: Math.random().toString(36).substr(2, 9),
+              velocity: { x: 0, y: 0, magnitude: 0 }
+            };
+          } else {
+            // Continue tracking the same ball
+            trackedBall = {
+              ...ball,
+              id: prevBall.id,
+              velocity: {
+                x: ball.x - prevBall.x,
+                y: ball.y - prevBall.y,
+                magnitude: Math.sqrt(
+                  Math.pow(ball.x - prevBall.x, 2) + 
+                  Math.pow(ball.y - prevBall.y, 2)
+                )
+              }
+            };
+          }
+        } else {
+          // First detection
+          trackedBall = {
+            ...ball,
+            id: Math.random().toString(36).substr(2, 9),
+            velocity: { x: 0, y: 0, magnitude: 0 }
+          };
+        }
+        
+        // Update previous balls for next frame
+        this.previousBalls = [trackedBall];
+        
+        // Update ball history for movement analysis
+        this.updateBallHistory([trackedBall]);
+        
+        return [trackedBall];
+      }
+      
+      updateBallHistory(balls) {
+        const currentTime = Date.now();
+        
+        // Since we only track one ball, simplify history management
+        if (balls.length === 0) {
+          // Clear history if no ball detected
+          this.ballHistory = {};
+          return;
+        }
+        
+        const ball = balls[0]; // Only one ball
+        
+        if (!this.ballHistory[ball.id]) {
+          this.ballHistory[ball.id] = [];
+        }
+        
+        this.ballHistory[ball.id].push({
+          x: ball.x,
+          y: ball.y,
+          timestamp: currentTime,
+          velocity: ball.velocity || { x: 0, y: 0, magnitude: 0 }
+        });
+        
+        // Keep only recent history (last 2 seconds)
+        const cutoffTime = currentTime - 2000;
+        this.ballHistory[ball.id] = this.ballHistory[ball.id].filter(
+          point => point.timestamp > cutoffTime
+        );
+        
+        // Clean up old ball histories (keep only current ball)
+        Object.keys(this.ballHistory).forEach(ballId => {
+          if (ballId !== ball.id) {
+            delete this.ballHistory[ballId];
+          }
+        });
+      }
+      
+      analyzeMovementPattern() {
+        // Get the current ball's history
+        const ballIds = Object.keys(this.ballHistory);
+        if (ballIds.length === 0) {
+          return { isThrow: false, direction: null };
+        }
+        
+        const ballId = ballIds[0]; // Only one ball
+        const history = this.ballHistory[ballId];
+        
+        if (history.length < 3) {
+          return { isThrow: false, direction: null };
+        }
+        
+        const recent = history.slice(-5); // Last 5 points
+        let totalMovement = 0;
+        let verticalMovement = 0;
+        
+        for (let i = 1; i < recent.length; i++) {
+          const prev = recent[i-1];
+          const curr = recent[i];
+          
+          const dx = curr.x - prev.x;
+          const dy = curr.y - prev.y;
+          const movement = Math.sqrt(dx*dx + dy*dy);
+          
+          totalMovement += movement;
+          verticalMovement += Math.abs(dy);
+        }
+        
+        const avgMovement = totalMovement / (recent.length - 1);
+        const isSignificantMovement = avgMovement > this.movementThreshold;
+        const isVerticalMovement = verticalMovement > totalMovement * 0.4;
+        
+        return {
+          isThrow: isSignificantMovement && isVerticalMovement,
+          direction: verticalMovement > 0 ? 'down' : 'up',
+          movement: avgMovement
+        };
+      }
+
+      reset() {
+        this.ballHistory = {};
+        this.previousBalls = [];
+      }
+    }
+
+    // Reset rep counter
+    function resetReps() {
+      reps = 0;
+      ballState = 'waiting';
+      startTime = null;
+      document.getElementById('reps').textContent = 'Reps: 0';
+      document.getElementById('timer').textContent = 'Time: 0s';
+      document.getElementById('rpm').textContent = 'RPM: 0';
+      document.getElementById('progress-bar').style.width = '0%';
+      
+      if (ballTracker) {
+        ballTracker.reset();
+      }
+    }
+
+    // Update progress bar
+    function updateProgressBar() {
+      const goal = parseInt(document.getElementById('goal-input').value);
+      const progress = (reps / goal) * 100;
+      document.getElementById('progress-bar').style.width = `${Math.min(progress, 100)}%`;
+    }
+
+    // Update timer and RPM display
+    function updateTimerAndRPM() {
+      if (!startTime) return;
+      
+      const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById('timer').textContent = `Time: ${elapsedSeconds}s`;
+
+      if (elapsedSeconds > 0) {
+        const rpm = Math.round((reps / elapsedSeconds) * 60);
+        document.getElementById('rpm').textContent = `RPM: ${rpm}`;
+      }
+    }
+
+    // Show notification
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.classList.add('show');
+      
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, 3000);
     }
 
     // Main detection loop
-    function detectionLoop() {
-      if (!video.paused && !video.ended) {
-        const now = Date.now();
-        
-        // Check if we're in a pause period after a rep
-        if (inRepPause) {
-          // If the pause period is over, exit the pause state
-          if (now >= repPauseEndTime) {
-            inRepPause = false;
-            
-            // Optional: Show visual indicator that next rep can be counted
-            if (showDetection) {
-              ctx.fillStyle = 'rgba(46, 196, 182, 0.5)';
-              ctx.fillRect(canvas.width - 30, 10, 20, 20);
-              ctx.font = '16px Montserrat';
-              ctx.fillStyle = 'white';
-              ctx.fillText('Ready', canvas.width - 90, 25);
-            }
-          } else {
-            // Still in pause period, show countdown
-            if (showDetection) {
-              const remainingPause = Math.ceil((repPauseEndTime - now) / 1000);
-              ctx.fillStyle = 'rgba(255, 159, 28, 0.5)';
-              ctx.fillRect(canvas.width - 30, 10, 20, 20);
-              ctx.font = '16px Montserrat';
-              ctx.fillStyle = 'white';
-              ctx.fillText(`Pause: ${remainingPause}s`, canvas.width - 120, 25);
-            }
-          }
-          
-          // Still detect motion but don't count reps during pause
-          activeDetector.detect(ctx, video);
-        } else {
-          // Not in pause period, detect motion and check for reps
-          const repDetected = activeDetector.detect(ctx, video);
-          
-          if (repDetected && workoutActive && (now - lastRepTime) > minRepDuration) {
-            // Increment rep counter
-            reps++;
-            totalReps++;
-            lastRepTime = now;
-            
-            // Enter pause state
-            inRepPause = true;
-            repPauseEndTime = now + minRepDuration; // Use minRepDuration as pause duration
-            
-            // Update UI
-            repCounter.textContent = `${reps} reps`;
-            todayReps.textContent = totalReps;
-            
-            // Play sound
-            if (document.getElementById('sound-effects').checked) {
-              repSound.play().catch(e => console.log('Audio play error:', e));
-            }
-            
-            // Check for milestones
-            if (reps % 10 === 0) {
-              if (document.getElementById('sound-effects').checked) {
-                milestoneSound.play().catch(e => console.log('Audio play error:', e));
-              }
-              
-              // Voice announcement
-              if (document.getElementById('voice-announcements').checked) {
-                announceReps(reps);
+    async function detect(video, canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      updateTimerAndRPM();
+
+      if (ballTracker && ballTracker.initialized) {
+        const detectedBalls = ballTracker.detectBalls(video);
+        const trackedBalls = ballTracker.filterAndTrackBalls(detectedBalls);
+        const detectedBall = trackedBalls.length > 0 ? trackedBalls[0] : null;
+        const currentTime = Date.now();
+
+        // Show detection visualization if enabled
+        if (window.showDetection && detectedBall) {
+          drawBallDetection([detectedBall], ctx);
+        }
+
+        // Rep counting state machine
+        switch (ballState) {
+          case 'waiting':
+            if (detectedBall) {
+              ballState = 'ball_present';
+              if (!startTime) {
+                startTime = Date.now();
               }
             }
-            
-            // Record rep timestamp
-            repHistory.push({
-              timestamp: now,
-              workout: workoutStartTime
-            });
-          }
-        }
-      }
-      
-      requestAnimationFrame(detectionLoop);
-    }
-
-    // Voice announcements
-    function announceReps(count) {
-      if ('speechSynthesis' in window) {
-        const announcement = new SpeechSynthesisUtterance(`${count} repetitions completed`);
-        window.speechSynthesis.speak(announcement);
-      }
-    }
-
-    // Timer functions
-    function startTimer() {
-      if (timerInterval) clearInterval(timerInterval);
-      
-      timerInterval = setInterval(() => {
-        if (!workoutActive) return;
-        
-        const elapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
-        const minutes = Math.floor(elapsed / 60);
-        const seconds = elapsed % 60;
-        
-        workoutTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        workoutTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      }, 1000);
-    }
-
-    function resetTimer() {
-      workoutTimer.textContent = '00:00';
-      workoutTime.textContent = '0:00';
-    }
-
-    // Event listeners
-    function setupEventListeners() {
-      // Toggle detection overlay
-      toggleDetectionBtn.addEventListener('click', () => {
-        showDetection = !showDetection;
-        toggleDetectionBtn.innerHTML = showDetection ? '👁️‍🗨️' : '👁️';
-      });
-      
-      // Reset counter
-      resetCounterBtn.addEventListener('click', () => {
-        reps = 0;
-        repCounter.textContent = '0 reps';
-      });
-      
-      // Start/stop workout
-      startWorkoutBtn.addEventListener('click', () => {
-        if (workoutActive) {
-          // Stop workout
-          workoutActive = false;
-          startWorkoutBtn.innerHTML = '<span class="btn-icon">▶️</span><span>Start Workout</span>';
-          
-          // Save workout to history if enabled
-          if (document.getElementById('save-history').checked && reps > 0) {
-            const workout = {
-              id: Date.now(),
-              date: new Date(),
-              duration: Math.floor((Date.now() - workoutStartTime) / 1000),
-              reps: reps,
-              type: detectionType
-            };
-            
-            workoutHistory.push(workout);
-            saveToLocalStorage();
-          }
-        } else {
-          // Start workout
-          workoutActive = true;
-          workoutStartTime = Date.now();
-          startWorkoutBtn.innerHTML = '<span class="btn-icon">⏹️</span><span>End Workout</span>';
-          reps = 0;
-          repCounter.textContent = '0 reps';
-          resetTimer();
-          startTimer();
-        }
-      });
-      
-      // Toggle focus mode
-      toggleFocusModeBtn.addEventListener('click', () => {
-        document.body.classList.toggle('focus-mode');
-        focusMode = document.body.classList.contains('focus-mode');
-      });
-      
-      // Settings panel with mobile improvements
-      openSettingsBtn.addEventListener('click', () => {
-        settingsPanel.classList.add('open');
-        
-        // On mobile, scroll to settings panel when opened
-        if (window.innerWidth <= 576) {
-          setTimeout(() => {
-            settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }, 100);
-        }
-      });
-      
-      closeSettingsBtn.addEventListener('click', () => {
-        settingsPanel.classList.remove('open');
-      });
-      
-      // Add swipe gesture support for mobile devices
-      let touchStartX = 0;
-      let touchEndX = 0;
-      
-      document.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
-      }, false);
-      
-      document.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-      }, false);
-      
-      function handleSwipe() {
-        const swipeThreshold = 100; // Minimum distance for swipe
-        
-        // Right to left swipe (open settings)
-        if (touchEndX < touchStartX - swipeThreshold) {
-          if (!settingsPanel.classList.contains('open')) {
-            settingsPanel.classList.add('open');
-            
-            // On mobile, scroll to settings panel when opened
-            if (window.innerWidth <= 576) {
-              setTimeout(() => {
-                settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }, 100);
-            }
-          }
-        }
-        
-        // Left to right swipe (close settings)
-        if (touchEndX > touchStartX + swipeThreshold) {
-          if (settingsPanel.classList.contains('open')) {
-            settingsPanel.classList.remove('open');
-          }
-        }
-      }
-      
-      // Detection type change
-      document.getElementById('detection-type').addEventListener('change', (e) => {
-        detectionType = e.target.value;
-        
-        switch (detectionType) {
-          case 'motion':
-            activeDetector = motionDetector;
             break;
-          case 'color':
-            activeDetector = colorTracker;
-            break;
-          case 'pose':
-            activeDetector = poseDetector;
-            break;
-        }
-      });
-      
-      // Sensitivity change
-      document.getElementById('sensitivity').addEventListener('input', (e) => {
-        sensitivity = parseInt(e.target.value);
-        motionDetector.setSensitivity(sensitivity);
-        colorTracker.setSensitivity(sensitivity);
-      });
-      
-      // Min rep duration change
-      document.getElementById('min-rep-duration').addEventListener('change', (e) => {
-        minRepDuration = parseInt(e.target.value);
-      });
-      
-      // Pause duration change (using the same value as minRepDuration for simplicity)
-      document.getElementById('min-rep-duration').addEventListener('change', (e) => {
-        // If we're currently in a pause, update the end time based on new duration
-        if (inRepPause) {
-          const remainingPercentage = (repPauseEndTime - Date.now()) / (minRepDuration);
-          minRepDuration = parseInt(e.target.value);
-          repPauseEndTime = Date.now() + (minRepDuration * remainingPercentage);
-        } else {
-          minRepDuration = parseInt(e.target.value);
-        }
-      });
-      
-      // Handle Safari audio unlock
-      document.addEventListener('click', unlockAudio, { once: true });
-      document.addEventListener('touchstart', unlockAudio, { once: true });
-      
-      // Navigation between pages
-      document.querySelectorAll('.nav-item[data-page]').forEach(item => {
-        item.addEventListener('click', () => {
-          // Would implement page navigation in a full app
-          document.querySelectorAll('.nav-item').forEach(navItem => {
-            navItem.classList.remove('active');
-          });
-          item.classList.add('active');
-        });
-      });
-    }
-    
-    // Unlock audio for Safari
-    function unlockAudio() {
-      repSound.play().then(() => {
-        repSound.pause();
-        repSound.currentTime = 0;
-      }).catch(e => console.log('Audio unlock error:', e));
-      
-      milestoneSound.play().then(() => {
-        milestoneSound.pause();
-        milestoneSound.currentTime = 0;
-      }).catch(e => console.log('Audio unlock error:', e));
-    }
-    
-    // Local storage functions
-    function saveToLocalStorage() {
-      try {
-        localStorage.setItem('repCounter_history', JSON.stringify(workoutHistory));
-        localStorage.setItem('repCounter_totalReps', totalReps.toString());
-      } catch (e) {
-        console.error('Error saving to localStorage:', e);
-      }
-    }
-    
-    function loadFromLocalStorage() {
-      try {
-        const history = localStorage.getItem('repCounter_history');
-        if (history) {
-          workoutHistory = JSON.parse(history);
-        }
-        
-        const savedTotalReps = localStorage.getItem('repCounter_totalReps');
-        if (savedTotalReps) {
-          totalReps = parseInt(savedTotalReps);
-          todayReps.textContent = totalReps;
-        }
-      } catch (e) {
-        console.error('Error loading from localStorage:', e);
-      }
-    }
-    
-    // Frame skipping for performance optimization
-    let frameCount = 0;
-    let inRepPause = false; // Flag to track if we're in the pause period after a rep
-    let repPauseEndTime = 0; // When the pause period ends
-    
-    function optimizedDetectionLoop() {
-      if (!video.paused && !video.ended) {
-        // Process every 2nd frame for better performance
-        frameCount++;
-        if (frameCount % 2 === 0) {
-          // Draw current frame
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          // Only run detection if workout is active
-          if (workoutActive) {
-            const now = Date.now();
             
-            // Check if we're in a pause period after a rep
-            if (inRepPause) {
-              // If the pause period is over, exit the pause state
-              if (now >= repPauseEndTime) {
-                inRepPause = false;
-                
-                // Optional: Show visual indicator that next rep can be counted
-                if (showDetection) {
-                  ctx.fillStyle = 'rgba(46, 196, 182, 0.5)';
-                  ctx.fillRect(canvas.width - 30, 10, 20, 20);
-                  ctx.font = '16px Montserrat';
-                  ctx.fillStyle = 'white';
-                  ctx.fillText('Ready', canvas.width - 90, 25);
-                }
-              } else {
-                // Still in pause period, show countdown
-                if (showDetection) {
-                  const remainingPause = Math.ceil((repPauseEndTime - now) / 1000);
-                  ctx.fillStyle = 'rgba(255, 159, 28, 0.5)';
-                  ctx.fillRect(canvas.width - 30, 10, 20, 20);
-                  ctx.font = '16px Montserrat';
-                  ctx.fillStyle = 'white';
-                  ctx.fillText(`Pause: ${remainingPause}s`, canvas.width - 120, 25);
-                }
+          case 'ball_present':
+            if (!detectedBall) {
+              absentFrames++;
+              if (absentFrames >= ballAbsentThreshold) {
+                ballState = 'ball_away';
+                lastBallAbsentTime = currentTime;
+                absentFrames = 0;
               }
-              
-              // Still detect motion but don't count reps during pause
-              activeDetector.detect(ctx, video);
             } else {
-              // Not in pause period, detect motion and check for reps
-              const repDetected = activeDetector.detect(ctx, video);
-              
-              if (repDetected && (now - lastRepTime) > minRepDuration) {
-                // Increment rep counter
-                reps++;
-                totalReps++;
-                lastRepTime = now;
-                
-                // Enter pause state
-                inRepPause = true;
-                repPauseEndTime = now + minRepDuration; // Use minRepDuration as pause duration
-                
-                // Update UI
-                repCounter.textContent = `${reps} reps`;
-                todayReps.textContent = totalReps;
-                
-                // Play sound
-                if (document.getElementById('sound-effects').checked) {
-                  repSound.play().catch(e => console.log('Audio play error:', e));
-                }
-                
-                // Check for milestones
-                if (reps % 10 === 0) {
-                  if (document.getElementById('sound-effects').checked) {
-                    milestoneSound.play().catch(e => console.log('Audio play error:', e));
-                  }
-                  
-                  // Voice announcement
-                  if (document.getElementById('voice-announcements').checked) {
-                    announceReps(reps);
-                  }
-                }
-                
-                // Record rep timestamp
-                repHistory.push({
-                  timestamp: now,
-                  workout: workoutStartTime
-                });
-                
-                // Save to local storage
-                if (document.getElementById('save-history').checked) {
-                  saveToLocalStorage();
-                }
+              absentFrames = 0;
+            }
+            break;
+            
+          case 'ball_away':
+            if (detectedBall) {
+              if (currentTime - lastBallAbsentTime > minAbsentTime && 
+                  currentTime - lastThrowTime > minTimeBetweenThrows) {
+                ballState = 'ball_returned';
+              } else {
+                // Ball returned too quickly, likely a flicker, go back to present
+                ballState = 'ball_present';
               }
             }
-          }
-        } else {
-          // Just draw the frame without detection
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            break;
+            
+          case 'ball_returned':
+            reps++;
+            lastThrowTime = currentTime;
+            
+            document.getElementById('reps').textContent = 'Reps: ' + reps;
+            const repSound = document.getElementById('rep-sound');
+            repSound.currentTime = 0;
+            repSound.play().catch(e => console.error('Audio play failed:', e));
+            updateProgressBar();
+            
+            // Show visual feedback for a short duration
+            ctx.fillStyle = '#00FF00';
+            ctx.font = 'bold 48px Poppins';
+            ctx.textAlign = 'center';
+            ctx.fillText('REP!', canvas.width / 2, canvas.height / 2);
+            ctx.textAlign = 'left';
+            
+            ballState = 'ball_present'; // Immediately go back to present
+            break;
         }
+
+        // Display current state for debugging
+        if (window.showDetection) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '16px Poppins';
+          ctx.fillText(`State: ${ballState}`, 10, 30);
+          ctx.fillText(`Detected: ${detectedBall ? 'Yes' : 'No'}`, 10, 50);
+          ctx.fillText(`Last Throw: ${Math.round((currentTime - lastThrowTime)/1000)}s ago`, 10, 70);
+        }
+      } else {
+        // OpenCV not ready, show status
+        ctx.fillStyle = '#FFFF00';
+        ctx.font = '20px Poppins';
+        ctx.textAlign = 'center';
+        ctx.fillText('Loading ball detection...', canvas.width / 2, canvas.height / 2);
+        ctx.textAlign = 'left';
       }
       
-      requestAnimationFrame(optimizedDetectionLoop);
+      if (window.ballDetectionActive) {
+        requestAnimationFrame(() => detect(video, canvas));
+      }
     }
-    
-    // Initialize the application
-    async function initApp() {
-      // Show loader while initializing
-      loader.style.display = 'flex';
-      
+
+    // Main initialization function
+    async function main() {
       try {
-        // Check if this is a mobile device
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        
-        console.log('Initializing app for device:', { isMobile, isIOS });
-        
-        // Apply mobile-specific adjustments
-        if (isMobile) {
-          // Force landscape orientation for better experience
-          if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
-            try {
-              await window.screen.orientation.lock('landscape');
-              console.log('Locked to landscape orientation');
-            } catch (e) {
-              console.log('Could not lock orientation:', e);
-              // Show orientation guidance for mobile users
-              const loaderMessage = document.querySelector('.loader-message');
-              if (loaderMessage) {
-                loaderMessage.textContent = 'For best experience, please use landscape orientation';
-              }
-            }
-          }
-          
-          // iOS-specific adjustments
-          if (isIOS) {
-            // Add iOS viewport fix
-            const viewportMeta = document.querySelector('meta[name="viewport"]');
-            if (viewportMeta) {
-              viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            }
-            
-            // Add fullscreen guidance for iOS
-            const iosGuidance = document.createElement('div');
-            iosGuidance.className = 'ios-guidance';
-            iosGuidance.innerHTML = 'For best experience, tap <b>Share</b> and <b>Add to Home Screen</b>, then open from there.';
-            iosGuidance.style.cssText = 'position:fixed; top:0; left:0; right:0; background:rgba(231, 29, 54, 0.9); color:white; padding:10px; text-align:center; z-index:9999; font-size:14px;';
-            document.body.appendChild(iosGuidance);
-            
-            // Auto-hide after 10 seconds
-            setTimeout(() => {
-              iosGuidance.style.display = 'none';
-            }, 10000);
-          }
-        }
-        
         // Setup camera
-        await setupCamera();
-        
-        // Load settings
-        loadFromLocalStorage();
-        
-        // Setup event listeners
-        setupEventListeners();
-        
-        // Initialize charts
-        initCharts();
-        
+        const video = await setupCamera();
+        const canvas = document.getElementById('canvas');
+        canvas.width = video.width;
+        canvas.height = video.height;
+
+        // Initialize ball tracker
+        ballTracker = new LacrosseBallTracker();
+        if (openCvReady) {
+          ballTracker.initialize();
+        }
+
+        // Initialize UI
+        window.showDetection = false;
+        const viewToggleButton = document.getElementById('view-toggle');
+        viewToggleButton.addEventListener('click', () => {
+          window.showDetection = !window.showDetection;
+          viewToggleButton.textContent = window.showDetection ? 'Hide Detection' : 'Show Detection';
+        });
+
         // Start detection loop
-        optimizedDetectionLoop();
-        
-        // Add mobile menu toggle functionality
-        setupMobileMenu();
-        
-        // Hide loader
-        loader.style.display = 'none';
-        
-        // Add a tap event to ensure proper initialization on iOS
-        if (isIOS) {
-          const tapToStart = document.createElement('div');
-          tapToStart.className = 'tap-to-start';
-          tapToStart.innerHTML = 'Tap anywhere to start camera';
-          tapToStart.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(67, 97, 238, 0.9); color:white; padding:20px; border-radius:10px; text-align:center; z-index:9998; font-size:18px;';
-          document.body.appendChild(tapToStart);
-          
-          const handleTap = () => {
-            tapToStart.style.display = 'none';
-            document.removeEventListener('click', handleTap);
-            document.removeEventListener('touchend', handleTap);
-          };
-          
-          document.addEventListener('click', handleTap);
-          document.addEventListener('touchend', handleTap);
-        }
+        window.ballDetectionActive = true;
+        detect(video, canvas);
+
+        // Setup UI event listeners
+        setupUI();
       } catch (error) {
-        console.error('Error initializing app:', error);
-        const errorMessage = `Error initializing the application: ${error.message}. Please refresh and try again.`;
-        alert(errorMessage);
+        console.error('Camera setup failed:', error);
         
-        // Update loader to show error
-        const loaderText = document.querySelector('.loader-text');
-        if (loaderText) {
-          loaderText.textContent = 'Initialization Failed';
-          loaderText.style.color = 'var(--danger)';
-        }
-        
-        const loaderMessage = document.querySelector('.loader-message');
-        if (loaderMessage) {
-          loaderMessage.innerHTML = `Error: ${error.message}<br>Please refresh the page or try a different browser.`;
-          loaderMessage.style.color = 'var(--danger)';
-        }
+        // Show error message to user
+        const repsDisplay = document.getElementById('reps');
+        repsDisplay.textContent = 'Camera setup failed';
       }
     }
-    
-    // Setup mobile-specific menu functionality
-    function setupMobileMenu() {
-      const menuToggle = document.querySelector('.menu-toggle');
-      const sidebar = document.querySelector('.sidebar');
+
+    // Setup UI event listeners
+    function setupUI() {
+      // Goal input controls
+      const goalInput = document.getElementById('goal-input');
+      const goalPlus = document.getElementById('goal-plus');
+      const goalMinus = document.getElementById('goal-minus');
       
-      if (menuToggle && sidebar) {
-        menuToggle.addEventListener('click', () => {
-          sidebar.classList.toggle('open');
-          menuToggle.classList.toggle('active');
-        });
-        
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', (e) => {
-          if (window.innerWidth <= 576 && 
-              sidebar.classList.contains('open') && 
-              !sidebar.contains(e.target) && 
-              !menuToggle.contains(e.target)) {
-            sidebar.classList.remove('open');
-            menuToggle.classList.remove('active');
-          }
-        });
-        
-        // Add double-tap to close for mobile
-        let lastTap = 0;
-        document.addEventListener('touchend', (e) => {
-          const currentTime = new Date().getTime();
-          const tapLength = currentTime - lastTap;
-          
-          if (tapLength < 500 && tapLength > 0) {
-            // Double tap detected
-            if (window.innerWidth <= 576 && 
-                sidebar.classList.contains('open') && 
-                !sidebar.contains(e.target) && 
-                !menuToggle.contains(e.target)) {
-              sidebar.classList.remove('open');
-              menuToggle.classList.remove('active');
-            }
-          }
-          
-          lastTap = currentTime;
-        });
-      }
+      goalInput.addEventListener('input', updateProgressBar);
+      
+      goalPlus.addEventListener('click', () => {
+        goalInput.value = parseInt(goalInput.value) + 10;
+        updateProgressBar();
+      });
+      
+      goalMinus.addEventListener('click', () => {
+        goalInput.value = Math.max(10, parseInt(goalInput.value) - 10);
+        updateProgressBar();
+      });
+
+      // Reset button
+      document.getElementById('reset-button').addEventListener('click', () => {
+        if (confirm('Are you sure you want to reset? This will clear all current progress.')) {
+          resetReps();
+        }
+      });
+
+      // Save button
+      document.getElementById('save-button').addEventListener('click', () => {
+        saveSession();
+        showNotification('Session saved!');
+      });
+
+      // Focus mode
+      const focusModeButton = document.getElementById('focus-mode-button');
+      const exitFocusModeButton = document.getElementById('exit-focus-mode');
+      
+      focusModeButton.addEventListener('click', () => {
+        document.body.classList.add('focus-view');
+        exitFocusModeButton.style.display = 'block';
+      });
+      
+      exitFocusModeButton.addEventListener('click', () => {
+        document.body.classList.remove('focus-view');
+        exitFocusModeButton.style.display = 'none';
+      });
+
+      // Menu icon
+      const menuIcon = document.getElementById('menu-icon');
+      const navDrawer = document.getElementById('nav-drawer');
+      
+      menuIcon.addEventListener('click', () => {
+        menuIcon.classList.toggle('open');
+        navDrawer.classList.toggle('open');
+      });
+
+      // Timer/RPM toggle
+      const timerRpmToggle = document.getElementById('timer-rpm-toggle');
+      const timerDisplay = document.getElementById('timer');
+      const rpmDisplay = document.getElementById('rpm');
+      
+      timerRpmToggle.addEventListener('change', () => {
+        if (timerRpmToggle.checked) {
+          timerDisplay.style.display = 'block';
+          rpmDisplay.style.display = 'block';
+        } else {
+          timerDisplay.style.display = 'none';
+          rpmDisplay.style.display = 'none';
+        }
+      });
+
+      // Modal controls
+      setupModals();
+      
+      // Load current user if available
+      loadCurrentUser();
     }
 
-    let openCvReady = false;
-    let ballTracker = null;
-    
-    function onOpenCvReady() {
-        openCvReady = true;
-        console.log('OpenCV.js is ready');
-        if (ballTracker) {
-            ballTracker.initialize();
+    // Setup modals
+    function setupModals() {
+      // Login modal
+      const loginModal = document.getElementById('login-modal');
+      const loginButton = document.getElementById('login-button');
+      const loginCloseButton = loginModal.querySelector('.close-button');
+      const loginSubmit = document.getElementById('login-submit');
+      
+      loginButton.addEventListener('click', () => {
+        loginModal.classList.add('show');
+      });
+      
+      loginCloseButton.addEventListener('click', () => {
+        loginModal.classList.remove('show');
+      });
+      
+      loginSubmit.addEventListener('click', () => {
+        login();
+      });
+      
+      // Leaderboard modal
+      const leaderboardModal = document.getElementById('leaderboard-modal');
+      const leaderboardButton = document.getElementById('leaderboard-button');
+      const leaderboardCloseButton = leaderboardModal.querySelector('.close-button');
+      
+      leaderboardButton.addEventListener('click', () => {
+        updateLeaderboard();
+        leaderboardModal.classList.add('show');
+      });
+      
+      leaderboardCloseButton.addEventListener('click', () => {
+        leaderboardModal.classList.remove('show');
+      });
+      
+      // Session history modal
+      const sessionHistoryModal = document.getElementById('session-history-modal');
+      const sessionHistoryButton = document.getElementById('session-history-button');
+      const sessionHistoryCloseButton = sessionHistoryModal.querySelector('.close-button');
+      
+      sessionHistoryButton.addEventListener('click', () => {
+        updateSessionHistory();
+        sessionHistoryModal.classList.add('show');
+      });
+      
+      sessionHistoryCloseButton.addEventListener('click', () => {
+        sessionHistoryModal.classList.remove('show');
+      });
+      
+      // Close modals when clicking outside
+      window.addEventListener('click', (event) => {
+        if (event.target === loginModal) {
+          loginModal.classList.remove('show');
+        } else if (event.target === leaderboardModal) {
+          leaderboardModal.classList.remove('show');
+        } else if (event.target === sessionHistoryModal) {
+          sessionHistoryModal.classList.remove('show');
         }
-    }
-
-    // Simple OpenCV.js loading function
-    function loadOpenCV() {
-      return new Promise((resolve, reject) => {
-        const progressBar = document.getElementById('loader-progress');
-        const percentageText = document.getElementById('loader-percentage');
-        const loaderText = document.querySelector('.loader-text');
-        const loaderMessage = document.querySelector('.loader-message');
-        
-        // Check if OpenCV is already loaded
-        if (typeof cv !== 'undefined') {
-          console.log('OpenCV.js already available');
-          progressBar.style.width = '100%';
-          percentageText.textContent = '100%';
-          return resolve();
-        }
-        
-        // Create a script element to load OpenCV.js
-        const script = document.createElement('script');
-        script.src = 'https://docs.opencv.org/4.8.0/opencv.js';
-        script.async = true;
-        
-        // Set up onload handler
-        script.onload = function() {
-          console.log('OpenCV.js script loaded');
-          progressBar.style.width = '100%';
-          percentageText.textContent = '100%';
-          onOpenCvReady(); // Call the onOpenCvReady function directly
-          resolve();
-        };
-        
-        // Set up error handler
-        script.onerror = function() {
-          console.error('Failed to load OpenCV.js');
-          loaderMessage.textContent = 'Failed to load OpenCV.js. Please check your internet connection and refresh the page.';
-          loaderText.textContent = 'Loading Failed';
-          loaderText.style.color = 'var(--danger)';
-          reject(new Error('Failed to load OpenCV.js'));
-        };
-        
-        // Add the script to the document
-        document.head.appendChild(script);
       });
     }
 
-    // Check browser compatibility with enhanced mobile support
-    function checkBrowserCompatibility() {
-      const isCompatible = {
-        status: true,
-        issues: [],
-        warnings: []
+    // Login function
+    function login() {
+      const username = document.getElementById('username-input').value.trim();
+      const password = document.getElementById('password-input').value.trim();
+      const loginError = document.getElementById('login-error');
+      
+      if (!username || !password) {
+        loginError.textContent = 'Please enter both username and password';
+        loginError.style.display = 'block';
+        return;
+      }
+      
+      // Simple client-side authentication (for demo purposes)
+      // In a real app, this would be a server request
+      let users = JSON.parse(localStorage.getItem('wallBallUsers') || '{}');
+      
+      if (!users[username]) {
+        // New user registration
+        users[username] = {
+          password: password, // In a real app, this would be hashed
+          sessions: [],
+          highScore: 0
+        };
+        localStorage.setItem('wallBallUsers', JSON.stringify(users));
+        localStorage.setItem('wallBallCurrentUser', username);
+        document.getElementById('login-modal').classList.remove('show');
+        loadCurrentUser();
+        showNotification('Welcome, new user created!');
+      } else if (users[username].password === password) {
+        // Existing user login
+        localStorage.setItem('wallBallCurrentUser', username);
+        document.getElementById('login-modal').classList.remove('show');
+        loadCurrentUser();
+        showNotification('Welcome back!');
+      } else {
+        // Incorrect password
+        loginError.textContent = 'Incorrect password';
+        loginError.style.display = 'block';
+      }
+    }
+
+    // Load current user
+    function loadCurrentUser() {
+      const currentUser = localStorage.getItem('wallBallCurrentUser');
+      const userGreeting = document.getElementById('user-greeting');
+      const loginButton = document.getElementById('login-button');
+      
+      if (currentUser) {
+        userGreeting.textContent = `Hello, ${currentUser}!`;
+        loginButton.textContent = 'Logout';
+        loginButton.removeEventListener('click', null);
+        loginButton.addEventListener('click', logout);
+      } else {
+        userGreeting.textContent = 'Not logged in';
+        loginButton.textContent = 'Login/Sign Up';
+      }
+    }
+
+    // Logout function
+    function logout() {
+      localStorage.removeItem('wallBallCurrentUser');
+      loadCurrentUser();
+      showNotification('Logged out successfully');
+    }
+
+    // Save session
+    function saveSession() {
+      const currentUser = localStorage.getItem('wallBallCurrentUser');
+      if (!currentUser) {
+        showNotification('Please login to save your session');
+        document.getElementById('login-modal').classList.add('show');
+        return;
+      }
+      
+      if (reps === 0) {
+        showNotification('No reps to save');
+        return;
+      }
+      
+      const users = JSON.parse(localStorage.getItem('wallBallUsers') || '{}');
+      const user = users[currentUser];
+      
+      if (!user) {
+        showNotification('User data error. Please login again.');
+        return;
+      }
+      
+      // Calculate session duration
+      const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+      
+      // Create session object
+      const session = {
+        reps: reps,
+        duration: duration,
+        rpm: duration > 0 ? Math.round((reps / duration) * 60) : 0,
+        date: new Date().toISOString(),
+        goal: parseInt(document.getElementById('goal-input').value)
       };
       
-      // Detect device type and browser
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      const isFirefox = navigator.userAgent.indexOf('Firefox') !== -1;
-      const isChrome = /Chrome/.test(navigator.userAgent) && !/Edge|Edg/.test(navigator.userAgent);
-      const isEdge = /Edge|Edg/.test(navigator.userAgent);
+      // Add to user's sessions
+      user.sessions.unshift(session); // Add to beginning of array
       
-      // More detailed WebAssembly support check (required for OpenCV.js)
-      let webAssemblySupported = typeof WebAssembly !== 'undefined';
-      
-      if (!webAssemblySupported) {
-        isCompatible.status = false;
-        isCompatible.issues.push('WebAssembly is not supported in this browser. OpenCV.js requires WebAssembly support. Please use a modern browser like Chrome, Firefox, or Edge.');
-      } else {
-        // Check for more advanced WebAssembly features needed by OpenCV.js
-        try {
-          // Test if we can instantiate a simple module
-          const module = new WebAssembly.Module(new Uint8Array([
-            0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00
-          ]));
-          const instance = new WebAssembly.Instance(module);
-          
-          // If we get here, basic WebAssembly is working
-          console.log('WebAssembly basic support confirmed');
-        } catch (e) {
-          console.error('WebAssembly instantiation failed:', e);
-          isCompatible.warnings.push('Your browser has limited WebAssembly support. OpenCV.js may not work correctly.');
-        }
+      // Keep only the last 10 sessions
+      if (user.sessions.length > 10) {
+        user.sessions = user.sessions.slice(0, 10);
       }
       
-      // Check for MediaDevices API (for camera access)
+      // Update high score if needed
+      if (reps > user.highScore) {
+        user.highScore = reps;
+        showNotification('New high score! 🏆');
+      }
+      
+      // Save updated user data
+      localStorage.setItem('wallBallUsers', JSON.stringify(users));
+      
+      // Reset reps for new session
+      resetReps();
+    }
+
+    // Update leaderboard
+    function updateLeaderboard() {
+      const leaderboardList = document.getElementById('leaderboard-list');
+      leaderboardList.innerHTML = '';
+      
+      const users = JSON.parse(localStorage.getItem('wallBallUsers') || '{}');
+      
+      // Convert to array and sort by high score
+      const sortedUsers = Object.entries(users)
+        .map(([username, data]) => ({ username, highScore: data.highScore }))
+        .sort((a, b) => b.highScore - a.highScore);
+      
+      if (sortedUsers.length === 0) {
+        leaderboardList.innerHTML = '<li>No scores yet</li>';
+        return;
+      }
+      
+      // Create leaderboard items
+      sortedUsers.forEach((user, index) => {
+        if (user.highScore > 0) {
+          const li = document.createElement('li');
+          li.innerHTML = `<strong>${index + 1}. ${user.username}</strong>: ${user.highScore} reps`;
+          leaderboardList.appendChild(li);
+        }
+      });
+    }
+
+    // Update session history
+    function updateSessionHistory() {
+      const sessionHistoryList = document.getElementById('session-history-list');
+      sessionHistoryList.innerHTML = '';
+      
+      const currentUser = localStorage.getItem('wallBallCurrentUser');
+      if (!currentUser) {
+        sessionHistoryList.innerHTML = '<li>Please login to view your history</li>';
+        return;
+      }
+      
+      const users = JSON.parse(localStorage.getItem('wallBallUsers') || '{}');
+      const user = users[currentUser];
+      
+      if (!user || !user.sessions || user.sessions.length === 0) {
+        sessionHistoryList.innerHTML = '<li>No sessions recorded yet</li>';
+        return;
+      }
+      
+      // Create session history items
+      user.sessions.forEach((session, index) => {
+        const date = new Date(session.date).toLocaleDateString();
+        const time = new Date(session.date).toLocaleTimeString();
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <strong>${date} at ${time}</strong><br>
+          Reps: ${session.reps} | Duration: ${session.duration}s | RPM: ${session.rpm}
+        `;
+        sessionHistoryList.appendChild(li);
+      });
+    }
+
+    // Check for browser compatibility
+    function checkBrowserCompatibility() {
+      const warnings = [];
+      
+      // Check for WebAssembly support (needed for OpenCV.js)
+      if (typeof WebAssembly !== 'object') {
+        warnings.push('WebAssembly is not supported in your browser. OpenCV.js requires WebAssembly.');
+      }
+      
+      // Check for camera API
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        isCompatible.status = false;
-        isCompatible.issues.push('Camera access is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Edge.');
+        warnings.push('Camera access is not supported in your browser.');
       }
       
       // Check for Canvas API
       if (!document.createElement('canvas').getContext) {
-        isCompatible.status = false;
-        isCompatible.issues.push('Canvas API is not supported in this browser.');
+        warnings.push('Canvas is not supported in your browser.');
       }
       
-      // Check for localStorage (for saving workout history)
+      // Check for localStorage
       try {
         localStorage.setItem('test', 'test');
         localStorage.removeItem('test');
       } catch (e) {
-        // Make this a warning instead of a critical issue
-        isCompatible.warnings.push('LocalStorage is not available. Workout history will not be saved.');
+        warnings.push('LocalStorage is not available. User data cannot be saved.');
       }
       
-      // Mobile-specific checks
-      if (isMobile) {
-        // Add mobile-specific warnings
-        isCompatible.warnings.push('For best experience, use your device in landscape orientation.');
-        
+      // Mobile-specific warnings
+      if (/Mobi|Android/i.test(navigator.userAgent)) {
         // iOS Safari specific warnings
-        if (isIOS) {
-          if (isSafari) {
-            isCompatible.warnings.push('On iOS Safari, you may need to enable camera access in Settings > Safari > Camera & Microphone Access.');
-            
-            // Check for iOS version - older versions have WebAssembly limitations
-            const iosVersion = (navigator.userAgent).match(/OS (\d+)_(\d+)_?(\d+)?/);
-            if (iosVersion && parseInt(iosVersion[1], 10) < 14) {
-              isCompatible.warnings.push('Your iOS version may have limited WebAssembly support. Consider updating your device for better performance.');
-            }
-          }
-          
-          // Check for iOS PWA mode which has better camera access
-          const isInPWA = window.navigator.standalone === true;
-          if (!isInPWA) {
-            isCompatible.warnings.push('For better performance, add this app to your home screen.');
-          }
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
+          warnings.push('On iOS, please use Safari for best performance and allow camera access when prompted.');
         }
         
-        // Android Chrome specific guidance
-        if (/Android/i.test(navigator.userAgent)) {
-          if (/Chrome/i.test(navigator.userAgent)) {
-            isCompatible.warnings.push('On Android Chrome, you may need to grant camera permissions when prompted.');
-            
-            // Check for Chrome version
-            const chromeVersion = navigator.userAgent.match(/Chrome\/(\d+)/);
-            if (chromeVersion && parseInt(chromeVersion[1], 10) < 90) {
-              isCompatible.warnings.push('Your Chrome version is older. Consider updating for better performance.');
-            }
-          } else {
-            isCompatible.warnings.push('For best experience on Android, use Chrome browser.');
-          }
+        // Android Chrome specific warnings
+        if (/Android/i.test(navigator.userAgent) && /Chrome/i.test(navigator.userAgent)) {
+          warnings.push('On Android, please keep the app open in the foreground for best performance.');
         }
         
-        // Check for device memory API and warn if low memory
-        if (navigator.deviceMemory) {
-          if (navigator.deviceMemory < 4) {
-            isCompatible.warnings.push('Your device has limited memory (less than 4GB). Performance may be affected.');
-          }
-          if (navigator.deviceMemory < 2) {
-            isCompatible.warnings.push('Your device has very limited memory (less than 2GB). The app may crash or run slowly.');
-          }
-        } else {
-          // If deviceMemory API is not available, make a general warning
-          isCompatible.warnings.push('Unable to detect device memory. If you experience performance issues, try closing other apps.');
-        }
+        // Memory warning for mobile devices
+        warnings.push('This app uses computer vision which may be resource-intensive on mobile devices.');
       }
       
-      // Display warnings if there are any but the app is still compatible
-      if (isCompatible.warnings.length > 0 && isCompatible.status) {
-        // Create a warning element that will be shown after the app loads
-        window.addEventListener('DOMContentLoaded', () => {
-          setTimeout(() => {
-            const warningElement = document.createElement('div');
-            warningElement.className = 'mobile-compatibility-warning';
-            warningElement.innerHTML = `
-              <div class="warning-content">
-                <h3>⚠️ Tips for Better Experience</h3>
-                <ul>${isCompatible.warnings.map(w => `<li>${w}</li>`).join('')}</ul>
-                <button class="btn btn-sm btn-outline close-warning">Got it</button>
-              </div>
-            `;
-            document.body.appendChild(warningElement);
-            
-            // Style the warning
-            const style = document.createElement('style');
-            style.textContent = `
-              .mobile-compatibility-warning {
-                position: fixed;
-                bottom: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: rgba(26, 26, 46, 0.95);
-                border: 1px solid var(--primary);
-                border-radius: 12px;
-                padding: 15px;
-                z-index: 9999;
-                max-width: 90%;
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-                animation: slideUp 0.5s ease-out;
-              }
-              .warning-content h3 {
-                font-size: 1rem;
-                margin-bottom: 10px;
-                color: var(--warning);
-              }
-              .warning-content ul {
-                padding-left: 20px;
-                margin-bottom: 15px;
-                font-size: 0.85rem;
-              }
-              .close-warning {
-                padding: 5px 10px;
-                font-size: 0.8rem;
-              }
-              @keyframes slideUp {
-                from { transform: translate(-50%, 100%); opacity: 0; }
-                to { transform: translate(-50%, 0); opacity: 1; }
-              }
-            `;
-            document.head.appendChild(style);
-            
-            // Add close button functionality
-            warningElement.querySelector('.close-warning').addEventListener('click', () => {
-              warningElement.style.animation = 'slideDown 0.5s ease-out forwards';
-              setTimeout(() => warningElement.remove(), 500);
-            });
-            
-            // Auto-hide after 15 seconds
-            setTimeout(() => {
-              if (document.body.contains(warningElement)) {
-                warningElement.style.animation = 'slideDown 0.5s ease-out forwards';
-                setTimeout(() => warningElement.remove(), 500);
-              }
-            }, 15000);
-          }, 3000); // Show warnings 3 seconds after app loads
-        });
-      }
-      
-      return isCompatible;
+      return warnings;
     }
-    
-    // Main initialization
-    window.onload = async () => {
-      try {
-        // Check browser compatibility first
-        const compatibility = checkBrowserCompatibility();
-        if (!compatibility.status) {
-          throw new Error('Browser compatibility issues: ' + compatibility.issues.join(' '));
-        }
-        
-        // Display any compatibility warnings
-        if (compatibility.warnings.length > 0) {
-          const warningContainer = document.getElementById('warning-container');
-          const warningList = document.getElementById('warning-list');
-          
-          if (warningContainer && warningList) {
-            warningList.innerHTML = compatibility.warnings.map(warning => `<li>${warning}</li>`).join('');
-            warningContainer.style.display = 'block';
-            
-            // Auto-hide warnings after 10 seconds
-            setTimeout(() => {
-              warningContainer.style.opacity = '0';
-              setTimeout(() => {
-                warningContainer.style.display = 'none';
-                warningContainer.style.opacity = '1';
-              }, 500);
-            }, 10000);
-          }
-        }
-        
-        // OpenCV.js is loaded via script tag with onload handler
-        // No need to call loadOpenCV() here
-        
-        // Initialize the application
-        await initApp();
-      } catch (error) {
-        console.error('Initialization error:', error);
-        
-        // Check if the error is related to OpenCV
-        const isOpenCVError = error.message.includes('OpenCV') || error.message.includes('cv');
-        
-        // Create an error message element
-        const errorElement = document.createElement('div');
-        errorElement.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(231, 29, 54, 0.9); color:white; padding:20px; border-radius:10px; text-align:center; z-index:9999; max-width:80%; box-shadow:0 5px 15px rgba(0,0,0,0.3);';
-        
-        // Provide more specific error messages based on the error type
-        if (isOpenCVError) {
-          errorElement.innerHTML = `
-            <h3 style="margin-bottom:15px;">Failed to load OpenCV.js library</h3>
-            <p>This could be due to:</p>
-            <ul style="text-align:left; margin:10px 0;">
-              <li>Network connectivity issues</li>
-              <li>Content blockers or ad blockers</li>
-              <li>Browser security settings</li>
-              <li>Insufficient memory on your device</li>
-            </ul>
-            <p>Please try:</p>
-            <ul style="text-align:left; margin:10px 0;">
-              <li>Refreshing the page</li>
-              <li>Using a different browser (Chrome or Firefox recommended)</li>
-              <li>Disabling content blockers or ad blockers</li>
-              <li>Clearing your browser cache</li>
-              <li>Closing other tabs and applications</li>
-            </ul>
-            <button id="retry-button" style="background:var(--primary); border:none; color:white; padding:10px 20px; border-radius:5px; margin-top:15px; cursor:pointer;">Retry Installation</button>
-          `;
-        } else {
-          errorElement.innerHTML = `
-            <h3 style="margin-bottom:15px;">Application Error</h3>
-            <p>${error.message}</p>
-            <p style="margin-top:10px;">Please try refreshing the page or check your internet connection.</p>
-            <p>If the problem persists, try using a different browser.</p>
-            <button id="retry-button" style="background:var(--primary); border:none; color:white; padding:10px 20px; border-radius:5px; margin-top:15px; cursor:pointer;">Retry</button>
-          `;
-        }
-        
-        document.body.appendChild(errorElement);
-        
-        // Add retry button functionality
-        document.getElementById('retry-button').onclick = () => window.location.reload();
-        
-        // Log detailed error for debugging
-        console.log('Detailed error information:', {
-          errorMessage: error.message,
-          errorStack: error.stack,
-          browserInfo: navigator.userAgent,
-          timestamp: new Date().toISOString()
-        });
+
+    // Window load event
+    window.onload = function() {
+      // Check browser compatibility
+      const warnings = checkBrowserCompatibility();
+      if (warnings.length > 0) {
+        const warningMessage = warnings.join('\n• ');
+        alert('Compatibility Notice:\n\n• ' + warningMessage);
       }
+      
+      // Initialize app
+      main().catch(err => {
+        console.error('Initialization failed:', err);
+        document.getElementById('reps').textContent = 'Error: ' + err.message;
+        document.getElementById('loader').style.opacity = '0';
+        document.getElementById('loader').style.visibility = 'hidden';
+      });
     };
-  </script>
-</body>
-</html>
+
+    // Handle double-tap on mobile to close sidebar
+    let lastTap = 0;
+    document.addEventListener('touchend', function(event) {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      if (tapLength < 500 && tapLength > 0) {
+        // Double tap detected
+        if (document.getElementById('nav-drawer').classList.contains('open')) {
+          document.getElementById('nav-drawer').classList.remove('open');
+          document.getElementById('menu-icon').classList.remove('open');
+        }
+      }
+      lastTap = currentTime;
+    });
