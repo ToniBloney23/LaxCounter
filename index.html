@@ -1,6 +1,259 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lax Wall Ball Counter</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        #container {
+            position: relative;
+            width: 90vw;
+            max-width: 640px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        .overlay-ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        #counter {
+            font-size: 3em;
+            font-weight: 700;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        #instructions {
+            font-size: 1em;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 200px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+        .control-button {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            background: linear-gradient(45deg, #ff416c, #ff4b2b);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        #loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #ff416c;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            display: none; /* Initially hidden */
+        }
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+    </style>
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <!-- COCO-SSD model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+</head>
+<body>
+    <div id="container">
+        <video id="video" width="640" height="480" autoplay muted playsinline style="display:none;"></video>
+        <canvas id="canvas" width="640" height="480"></canvas>
+        <div id="loader"></div>
+        <div class="overlay-ui">
+            <div id="counter">0</div>
+            <div id="instructions">
+                <p><strong>Wall Ball Tracker</strong></p>
+                <p>Aim your camera at the wall. The app will count reps when the ball hits the designated wall zone.</p>
+            </div>
+        </div>
+        <div id="controls">
+            <button id="startButton" class="control-button">Start</button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startButton = document.getElementById('startButton');
+        const counterElement = document.getElementById('counter');
+        const loader = document.getElementById('loader');
+        const controls = document.getElementById('controls');
+
+        let model = null;
+        let repCount = 0;
+        let ballState = { x: 0, y: 0, detected: false, lastDetectionTime: 0 };
+        let lastWallHitTime = 0;
+        let isDetecting = false;
+
+        // --- Main Setup ---
+        async function setup() {
+            loader.style.display = 'block';
+            await cocoSsd.load().then(loadedModel => {
+                model = loadedModel;
+                console.log('Object detection model loaded.');
+                loader.style.display = 'none';
+                startButton.disabled = false;
+                startButton.textContent = 'Start Camera';
+            });
+
+            startButton.addEventListener('click', async () => {
+                if (!isDetecting) {
+                    await setupCamera();
+                    video.play();
+                    isDetecting = true;
+                    detectFrame();
+                    controls.style.display = 'none';
+                }
+            });
+        }
+
+        // Initial state
+        startButton.disabled = true;
+
+        async function setupCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }, // Use 'user' for front camera
+                audio: false
+            });
+            video.srcObject = stream;
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    resolve(video);
+                };
+            });
+        }
+
+        async function detectFrame() {
+            if (!model) {
+                requestAnimationFrame(detectFrame);
+                return;
+            }
+
+            const predictions = await model.detect(video);
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const ball = predictions.find(p => p.class === 'sports ball');
+
+            if (ball) {
+                // Draw bounding box
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(ball.bbox[0], ball.bbox[1], ball.bbox[2], ball.bbox[3]);
+                ctx.fillStyle = 'red';
+                ctx.fillText(`${ball.class} (${Math.round(ball.score * 100)}%)`, ball.bbox[0], ball.bbox[1] > 10 ? ball.bbox[1] - 5 : 10);
+
+                const ballCenterX = ball.bbox[0] + ball.bbox[2] / 2;
+                const ballCenterY = ball.bbox[1] + ball.bbox[3] / 2;
+
+                updateBallState(ballCenterX, ballCenterY);
+                checkForRep();
+            } else {
+                ballState.detected = false;
+            }
+
+            requestAnimationFrame(detectFrame);
+        }
+
+        function updateBallState(x, y) {
+            ballState.x = x;
+            ballState.y = y;
+            ballState.detected = true;
+            ballState.lastDetectionTime = Date.now();
+        }
+
+        function checkForRep() {
+            const now = Date.now();
+            // Define a "wall zone" as the far side of the screen (e.g., right 20%)
+            const wallZoneStart = canvas.width * 0.8;
+
+            // Cooldown period to prevent multiple counts for one hit
+            const cooldown = 1000; // 1 second
+
+            if (ballState.x > wallZoneStart && now - lastWallHitTime > cooldown) {
+                repCount++;
+                counterElement.textContent = repCount;
+                lastWallHitTime = now;
+                console.log(`Rep counted! Total: ${repCount}`);
+            }
+        }
+
+        // --- Suggestions for improving accuracy ---
+        /*
+        1. Custom Model: Train a model specifically on lacrosse balls for better detection.
+        2. Pose Detection: Use a model like MoveNet or PoseNet to track the player's body.
+           A 'catch' could be registered when the ball's position is near the player's hands.
+        3. Trajectory Analysis: Instead of simple zones, track the ball's path over several frames.
+           A rep could be a sequence of: throw -> hit (sudden change in direction) -> catch.
+           This is more complex but much more robust.
+        4. User-defined Zones: Allow the user to draw a rectangle on the screen to define the 'wall' area.
+           This makes the app adaptable to different environments.
+        5. Kalman Filter: Use a Kalman filter to smooth the ball's detected position and predict its location
+           if the model temporarily loses track of it. This helps bridge gaps in detection.
+        */
+
+        setup();
+    </script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
