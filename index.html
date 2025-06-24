@@ -11,7 +11,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+ <script
+  async
+  src="https://docs.opencv.org/4.8.0/opencv.js"
+  onload="onOpenCvReady();"
+  onerror="onOpenCvLoadError();"
+  type="text/javascript"
+   function onOpenCvLoadError() {
+  document.getElementById('loader').style.opacity = '1';
+  document.getElementById('loader').style.visibility = 'visible';
+  document.querySelector('.loader-text').textContent = 'Failed to load OpenCV.js';
+  document.querySelector('.loader-message').textContent =
+    'Check your internet connection or try refreshing the page. If the problem persists, try using a different network.';
+}
+></script>
 
   <style>
     :root {
