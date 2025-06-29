@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaxCounter - Wall-Ball Rep Counter</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>LaxCounter</h1>
+    <div id="container">
+        <video id="video" width="640" height="480" autoplay playsinline></video>
+        <canvas id="output" width="640" height="480"></canvas>
+        <div id="ui-container">
+            <div id="rep-counter">0</div>
+            <div id="progress-container">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+    <script src="app.js"></script>
+</body>
+</html>
