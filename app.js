@@ -7,7 +7,7 @@ const rpmElement = document.getElementById('rpm');
 const startBtn = document.getElementById('start-btn');
 const pauseBtn = document.getElementById('pause-btn');
 const resetBtn = document.getElementById('reset-btn');
-const startOverlay = document.getElementById('start-overlay');
+
 const consistencyElement = document.getElementById('consistency');
 
 let repCount = 0;
@@ -210,11 +210,8 @@ function playSound() {
     oscillator.stop(audioCtx.currentTime + 0.1);
 }
 
-startOverlay.onclick = () => {
-    startOverlay.style.display = 'none';
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-};
+// Initialize AudioContext on load since the overlay is removed
+audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 const pose = new Pose({
     locateFile: (file) => {
