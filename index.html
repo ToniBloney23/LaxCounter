@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="start-overlay">
+        <div id="start-message">Click to Start</div>
+    </div>
     <h1>LaxCounter</h1>
     <div id="container">
         <video id="video" width="640" height="480" autoplay playsinline></video>
@@ -15,6 +18,15 @@
             <div id="rep-counter">0</div>
             <div id="progress-container">
                 <div id="progress-bar"></div>
+            </div>
+            <div id="stats-container">
+                <div id="rpm">RPM: 0</div>
+                <div id="consistency">Consistency: 100%</div>
+            </div>
+            <div id="controls-container">
+                <button id="start-btn">Start</button>
+                <button id="pause-btn">Pause</button>
+                <button id="reset-btn">Reset</button>
             </div>
         </div>
     </div>
