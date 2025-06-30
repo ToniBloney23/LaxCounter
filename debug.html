@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ball Detector Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .debug-section {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+        .error { border-left-color: #f44336; }
+        .success { border-left-color: #4CAF50; }
+        .warning { border-left-color: #ff9800; }
+        .test-result {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .pass { background: #e8f5e8; color: #2e7d32; }
+        .fail { background: #ffebee; color: #c62828; }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1976D2; }
+        #cameraTest {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            background: #000;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Ball Detector Debug Tool</h1>
+    <p>This page helps diagnose issues with the ball detector app.</p>
+    
+    <div class="debug-section">
+        <h3>📋 System Information</h3>
+        <div id="systemInfo"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>🌐 Browser Compatibility</h3>
+        <div id="browserTests"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>📡 Network & HTTPS</h3>
+        <div id="networkTests"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>📚 Script Loading</h3>
+        <div id="scriptTests"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>📹 Camera Test</h3>
+        <button onclick="testCamera()">Test Camera Access</button>
+        <div id="cameraResults"></div>
+        <video id="cameraTest" autoplay muted playsinline style="display:none;"></video>
+    </div>
+    
+    <div class="debug-section">
+        <h3>🔗 Quick Actions</h3>
+        <button onclick="location.href='index.html'">Go to Main App</button>
+        <button onclick="location.reload()">Refresh Debug</button>
+        <button onclick="copyDebugInfo()">Copy Debug Info</button>
+    </div>
+    
+    <script>
+        let debugInfo = {};
+        
+        function addResult(containerId, test, result, details = '') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `test-result ${result ? 'pass' : 'fail'}`;
+            div.innerHTML = `
+                <strong>${test}:</strong> ${result ? '✅ PASS' : '❌ FAIL'}
+                ${details ? `<br><small>${details}</small>` : ''}
+            `;
+            container.appendChild(div);
+            debugInfo[test] = { result, details };
+        }
+        
+        function runSystemTests() {
+            const info = document.getElementById('systemInfo');
+            info.innerHTML = `
+                <p><strong>User Agent:</strong> ${navigator.userAgent}</p>
+                <p><strong>Platform:</strong> ${navigator.platform}</p>
+                <p><strong>Language:</strong> ${navigator.language}</p>
+                <p><strong>URL:</strong> ${location.href}</p>
+                <p><strong>Protocol:</strong> ${location.protocol}</p>
+                <p><strong>Hostname:</strong> ${location.hostname}</p>
+            `;
+        }
+        
+        function runBrowserTests() {
+            addResult('browserTests', 'getUserMedia Support', 
+                !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+                navigator.mediaDevices ? 'MediaDevices API available' : 'MediaDevices API not found'
+            );
+            
+            addResult('browserTests', 'Canvas Support', 
+                !!(document.createElement('canvas').getContext),
+                'HTML5 Canvas required for video processing'
+            );
+            
+            addResult('browserTests', 'ES6 Support', 
+                typeof Promise !== 'undefined' && typeof fetch !== 'undefined',
+                'Modern JavaScript features required'
+            );
+            
+            addResult('browserTests', 'Local Storage', 
+                typeof Storage !== 'undefined',
+                'For saving settings and preferences'
+            );
+        }
+        
+        function runNetworkTests() {
+            const isHTTPS = location.protocol === 'https:';
+            const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            
+            addResult('networkTests', 'HTTPS or Localhost', 
+                isHTTPS || isLocalhost,
+                isHTTPS ? 'Using HTTPS' : isLocalhost ? 'Using localhost' : 'Camera requires HTTPS or localhost'
+            );
+            
+            addResult('networkTests', 'Online Status', 
+                navigator.onLine,
+                navigator.onLine ? 'Connected to internet' : 'Offline - may affect script loading'
+            );
+        }
+        
+        function runScriptTests() {
+            addResult('scriptTests', 'TensorFlow.js', 
+                typeof tf !== 'undefined',
+                typeof tf !== 'undefined' ? `Version: ${tf.version.tfjs || 'Unknown'}` : 'TensorFlow.js not loaded'
+            );
+            
+            addResult('scriptTests', 'COCO-SSD Model', 
+                typeof cocoSsd !== 'undefined',
+                typeof cocoSsd !== 'undefined' ? 'COCO-SSD available' : 'COCO-SSD not loaded'
+            );
+        }
+        
+        async function testCamera() {
+            const resultsDiv = document.getElementById('cameraResults');
+            const video = document.getElementById('cameraTest');
+            
+            resultsDiv.innerHTML = '<p>Testing camera access...</p>';
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                
+                video.srcObject = stream;
+                video.style.display = 'block';
+                
+                resultsDiv.innerHTML = `
+                    <div class="test-result pass">
+                        <strong>Camera Access:</strong> ✅ SUCCESS<br>
+                        <small>Camera is working! You should see video above.</small>
+                    </div>
+                `;
+                
+                // Stop the stream after 10 seconds
+                setTimeout(() => {
+                    stream.getTracks().forEach(track => track.stop());
+                    video.style.display = 'none';
+                    resultsDiv.innerHTML += '<p><em>Camera test completed.</em></p>';
+                }, 10000);
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="test-result fail">
+                        <strong>Camera Access:</strong> ❌ FAILED<br>
+                        <small>Error: ${error.name} - ${error.message}</small>
+                    </div>
+                `;
+            }
+        }
+        
+        function copyDebugInfo() {
+            const info = JSON.stringify(debugInfo, null, 2);
+            const fullInfo = `
+Ball Detector Debug Report
+=========================
+URL: ${location.href}
+User Agent: ${navigator.userAgent}
+Timestamp: ${new Date().toISOString()}
+
+Test Results:
+${info}
+            `;
+            
+            navigator.clipboard.writeText(fullInfo).then(() => {
+                alert('Debug info copied to clipboard!');
+            }).catch(() => {
+                prompt('Copy this debug info:', fullInfo);
+            });
+        }
+        
+        // Run tests on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            runSystemTests();
+            runBrowserTests();
+            runNetworkTests();
+            runScriptTests();
+        });
+    </script>
+    
+    <!-- Load the same scripts as the main app -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+</body>
+</html>
